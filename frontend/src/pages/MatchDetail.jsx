@@ -158,12 +158,12 @@ export default function MatchDetail() {
                     }`}>
                       {rank}
                     </span>
-                    <span className="font-medium text-sm">{entry.username}</span>
+                    <Link to={`/user/${entry.user_id}`} onClick={e => e.stopPropagation()} className="font-medium text-sm hover:text-green-400 transition-colors">{entry.username}</Link>
                     <span className="text-sm text-orange-400">{entry.captain}</span>
                     <span className="text-sm text-cyan-400">{entry.vice_captain}</span>
-                    <span className="text-right font-semibold text-green-400 text-sm">
+                    <Link to={`/team/${entry.user_team_id}`} onClick={e => e.stopPropagation()} className="text-right font-semibold text-green-400 text-sm hover:text-green-300 transition-colors">
                       {entry.total_points.toFixed(1)}
-                    </span>
+                    </Link>
                   </div>
 
                   {/* Expandable player list */}

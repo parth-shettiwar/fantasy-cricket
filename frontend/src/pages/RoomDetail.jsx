@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import api from '../api/client'
 
 export default function RoomDetail() {
@@ -122,7 +122,7 @@ export default function RoomDetail() {
                   }`}>
                     #{rank}
                   </span>
-                  <span className="font-medium">{entry.username}</span>
+                  <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-green-400 transition-colors">{entry.username}</Link>
                   <span className="text-right font-semibold text-green-400">{entry.total_points.toFixed(1)}</span>
                   <span className="text-right text-gray-400">{entry.teams_count}</span>
                 </div>
@@ -138,7 +138,7 @@ export default function RoomDetail() {
         <div className="bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
           {room.members.map(member => (
             <div key={member.user_id} className="px-5 py-3 flex items-center justify-between">
-              <span className="font-medium">{member.username}</span>
+              <Link to={`/user/${member.user_id}`} className="font-medium hover:text-green-400 transition-colors">{member.username}</Link>
               {member.user_id === room.created_by && (
                 <span className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full">Admin</span>
               )}

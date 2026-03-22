@@ -10,6 +10,8 @@ import Register from './pages/Register'
 import Rooms from './pages/Rooms'
 import RoomDetail from './pages/RoomDetail'
 import JoinRoom from './pages/JoinRoom'
+import UserProfile from './pages/UserProfile'
+import TeamDetail from './pages/TeamDetail'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -105,6 +107,8 @@ function App() {
           <Route path="/rooms/:roomId" element={user ? <RoomDetail /> : <Navigate to="/login" />} />
           <Route path="/join/:inviteCode" element={<JoinRoom />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/user/:userId" element={<UserProfile />} />
+          <Route path="/team/:teamId" element={<TeamDetail />} />
         </Routes>
       </main>
     </div>

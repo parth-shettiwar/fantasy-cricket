@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api/client'
 
 export default function Leaderboard() {
@@ -52,7 +53,7 @@ export default function Leaderboard() {
                 }`}>
                   #{rank}
                 </span>
-                <span className="font-medium">{entry.username}</span>
+                <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-green-400 transition-colors">{entry.username}</Link>
                 <span className="text-right font-semibold text-green-400">{entry.total_points.toFixed(1)}</span>
                 <span className="text-right text-gray-400">{entry.teams_count}</span>
               </div>

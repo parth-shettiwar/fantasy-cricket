@@ -4,7 +4,7 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import (
-    UserTeam, PlayerMatchPerformance, Player, User, user_team_players,
+    UserTeam, PlayerMatchPerformance, Player, User, Match, user_team_players,
 )
 from app.schemas import (
     TeamPointsBreakdown, PlayerPoints, LeaderboardEntry, PerformanceResponse,
@@ -206,3 +206,128 @@ def all_team_counts(db: Session = Depends(get_db)):
         .all()
     )
     return {str(mid): cnt for mid, cnt in rows}
+
+
+@router.get("/user/{user_id}/profile")
+def user_profile(user_id: int, db: Session = Depends(get_db)):
+    """Public profile: user's match history with points per match."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    teams = (
+        db.query(UserTeam)
+        .options(
+            joinedload(UserTeam.match).joinedload(Match.team1),
+            joinedload(UserTeam.match).joinedload(Match.team2),
+            joinedload(UserTeam.captain),
+            joinedload(UserTeam.vice_captain),
+        )
+        .filter(UserTeam.user_id == user_id)
+        .order_by(UserTeam.match_id.desc())
+        .all()
+    )
+
+    overall_points = sum(ut.total_points for ut in teams)
+
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "total_points": overall_points,
+        "matches_played": len(teams),
+        "teams": [
+            {
+                "user_team_id": ut.id,
+                "match_id": ut.match_id,
+                "match_name": f"{ut.match.team1.short_name} vs {ut.match.team2.short_name}" if ut.match else "?",
+                "match_date": ut.match.date.isoformat() if ut.match else "",
+                "match_status": ut.match.status.value if ut.match else "",
+                "venue": ut.match.venue if ut.match else "",
+                "captain": ut.captain.name if ut.captain else "?",
+                "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
+                "total_points": ut.total_points,
+            }
+            for ut in teams
+        ],
+    }
+
+
+@router.get("/user-team/{user_team_id}/detail")
+def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
+    """Public view of any user's team with per-player points breakdown."""
+    ut = (
+        db.query(UserTeam)
+        .options(
+            joinedload(UserTeam.players).joinedload(Player.team),
+            joinedload(UserTeam.match).joinedload(Match.team1),
+            joinedload(UserTeam.match).joinedload(Match.team2),
+            joinedload(UserTeam.captain),
+            joinedload(UserTeam.vice_captain),
+        )
+        .filter(UserTeam.id == user_team_id)
+        .first()
+    )
+    if not ut:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    user = db.query(User).filter(User.id == ut.user_id).first()
+
+    player_details = []
+    for player in ut.players:
+        perf = (
+            db.query(PlayerMatchPerformance)
+            .filter(
+                PlayerMatchPerformance.player_id == player.id,
+                PlayerMatchPerformance.match_id == ut.match_id,
+            )
+            .first()
+        )
+
+        is_cap = player.id == ut.captain_id
+        is_vc = player.id == ut.vice_captain_id
+        pts_data = {"batting": 0, "bowling": 0, "fielding": 0, "bonus": 0, "total": 0, "final": 0}
+
+        if perf:
+            pts = calculate_player_points(perf, player.role)
+            final = calculate_final_points(pts["total_points"], is_cap, is_vc)
+            pts_data = {
+                "batting": pts["batting_points"],
+                "bowling": pts["bowling_points"],
+                "fielding": pts["fielding_points"],
+                "bonus": pts["bonus_points"],
+                "total": pts["total_points"],
+                "final": final,
+            }
+
+        player_details.append({
+            "player_id": player.id,
+            "name": player.name,
+            "role": player.role.value,
+            "team_short": player.team.short_name if player.team else "",
+            "is_captain": is_cap,
+            "is_vice_captain": is_vc,
+            "points": pts_data,
+            "stats": {
+                "runs": perf.runs if perf else 0,
+                "balls": perf.balls_faced if perf else 0,
+                "fours": perf.fours if perf else 0,
+                "sixes": perf.sixes if perf else 0,
+                "wickets": perf.wickets if perf else 0,
+                "overs": perf.overs_bowled if perf else 0,
+                "catches": perf.catches if perf else 0,
+            } if perf and perf.is_playing else None,
+        })
+
+    return {
+        "user_team_id": ut.id,
+        "user_id": ut.user_id,
+        "username": user.username if user else "?",
+        "match_id": ut.match_id,
+        "match_name": f"{ut.match.team1.short_name} vs {ut.match.team2.short_name}" if ut.match else "?",
+        "match_date": ut.match.date.isoformat() if ut.match else "",
+        "match_status": ut.match.status.value if ut.match else "",
+        "total_points": ut.total_points,
+        "captain": ut.captain.name if ut.captain else "?",
+        "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
+        "players": sorted(player_details, key=lambda p: -p["points"]["final"]),
+    }
