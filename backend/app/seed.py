@@ -354,69 +354,13 @@ def seed():
                 db.flush()
                 player_objects.setdefault(short, []).append(p)
 
-        # Create matches (8 matches spread over next 2 weeks + 2 completed)
-        now = datetime.utcnow()
-        match_objects = []
-
-        team_shorts = list(team_objects.keys())
-        match_pairs = [
-            (team_shorts[0], team_shorts[1]),  # MI vs CSK
-            (team_shorts[2], team_shorts[3]),  # RCB vs KKR
-            (team_shorts[4], team_shorts[5]),  # DC vs RR
-            (team_shorts[6], team_shorts[7]),  # SRH vs PBKS
-            (team_shorts[8], team_shorts[9]),  # LSG vs GT
-            (team_shorts[0], team_shorts[3]),  # MI vs KKR
-            (team_shorts[1], team_shorts[2]),  # CSK vs RCB
-            (team_shorts[5], team_shorts[6]),  # RR vs SRH
-            (team_shorts[7], team_shorts[8]),  # PBKS vs LSG
-            (team_shorts[9], team_shorts[4]),  # GT vs DC
-        ]
-
-        for i, (t1_short, t2_short) in enumerate(match_pairs):
-            if i < 2:
-                # Completed matches (yesterday and day before)
-                match_date = now - timedelta(days=2 - i, hours=random.randint(0, 4))
-                status = MatchStatus.COMPLETED
-            else:
-                # Upcoming matches
-                match_date = now + timedelta(days=i - 1, hours=random.randint(14, 20))
-                status = MatchStatus.UPCOMING
-
-            lock_time = match_date - timedelta(minutes=30)
-            venue = VENUES[i % len(VENUES)]
-
-            m = Match(
-                team1_id=team_objects[t1_short].id,
-                team2_id=team_objects[t2_short].id,
-                date=match_date,
-                venue=venue,
-                status=status,
-                lock_time=lock_time,
-            )
-            db.add(m)
-            db.flush()
-            match_objects.append((m, t1_short, t2_short))
-
-        # Generate performances for completed matches
-        for m, t1_short, t2_short in match_objects:
-            if m.status != MatchStatus.COMPLETED:
-                continue
-
-            for short in (t1_short, t2_short):
-                squad = player_objects[short]
-                playing_xi = random.sample(squad, min(11, len(squad)))
-                playing_ids = {p.id for p in playing_xi}
-
-                for p in squad:
-                    is_playing = p.id in playing_ids
-                    perf_data = generate_mock_performance(p, m, is_playing)
-                    perf = PlayerMatchPerformance(**perf_data)
-                    db.add(perf)
+        # No fake matches — real matches are imported via the admin API
+        # (/api/admin/import-series/9241 for IPL 2026)
 
         db.commit()
         print(f"Seeded {len(team_objects)} teams, "
-              f"{sum(len(v) for v in player_objects.values())} players, "
-              f"{len(match_objects)} matches")
+              f"{sum(len(v) for v in player_objects.values())} players. "
+              f"Import real matches via POST /api/admin/import-series/<series_id>")
 
     finally:
         db.close()
