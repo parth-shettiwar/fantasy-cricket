@@ -20,6 +20,12 @@ def run_migrations():
                     "ALTER TABLE matches ADD COLUMN cricbuzz_match_id VARCHAR"
                 ))
                 print("Migration: added cricbuzz_match_id to matches")
+        if "locked_playing_ids" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE matches ADD COLUMN locked_playing_ids TEXT"
+                ))
+                print("Migration: added locked_playing_ids to matches")
 
 TEAMS = [
     ("Mumbai Indians", "MI"),

@@ -316,7 +316,7 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.id == ut.user_id).first()
 
-    effective = _build_effective_xi(ut, ut.match_id, db)
+    effective = _build_effective_xi(ut, ut.match_id, db, match=ut.match)
     effective_ids = {p.id for p in effective}
     main_ids = {p.id for p in ut.players}
     sub_ids = {s.player_id for s in ut.substitutes}

@@ -1,9 +1,24 @@
-"""Background scheduler that polls Cricbuzz for live match scores."""
+"""Background scheduler that polls Cricbuzz for live match scores.
+
+Playing-XI lock semantics
+-------------------------
+The first time the scraper detects players for a match (toss / start),
+the set of playing player IDs is frozen into ``Match.locked_playing_ids``
+(JSON array).  All subsequent substitution logic and scoring use that
+snapshot so that mid-game changes (e.g. IPL Impact Player swaps) do NOT
+alter fantasy teams.  Player *stats* (runs, wickets …) keep updating for
+all players that appear in the scorecard, but only locked-in players
+count towards ``is_playing`` for fantasy purposes.
+"""
+
+from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import Counter
 from datetime import datetime
+from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session, joinedload
@@ -23,6 +38,13 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 
+def _get_locked_ids(match: Match) -> Optional[set[int]]:
+    """Return the frozen playing-XI set, or None if not yet locked."""
+    if match.locked_playing_ids:
+        return set(json.loads(match.locked_playing_ids))
+    return None
+
+
 async def update_match_scores(match: Match, db: Session):
     """Scrape scorecard and update player performances for a single match."""
     if not match.cricbuzz_match_id:
@@ -40,7 +62,7 @@ async def update_match_scores(match: Match, db: Session):
     )
     name_index = build_player_name_index(players)
 
-    playing_player_ids: set[int] = set()
+    scraped_playing_ids: set[int] = set()
     batting_by_id: dict[int, dict] = {}
     bowling_by_id: dict[int, dict] = {}
     fielding_by_id: dict[int, dict] = {}
@@ -49,7 +71,7 @@ async def update_match_scores(match: Match, db: Session):
         pid = match_player_name(entry.name, name_index)
         if pid is None:
             continue
-        playing_player_ids.add(pid)
+        scraped_playing_ids.add(pid)
         batting_by_id[pid] = {
             "runs": entry.runs,
             "balls_faced": entry.balls,
@@ -61,7 +83,7 @@ async def update_match_scores(match: Match, db: Session):
         pid = match_player_name(entry.name, name_index)
         if pid is None:
             continue
-        playing_player_ids.add(pid)
+        scraped_playing_ids.add(pid)
         bowling_by_id[pid] = {
             "overs_bowled": entry.overs,
             "maidens": entry.maidens,
@@ -79,6 +101,16 @@ async def update_match_scores(match: Match, db: Session):
             "run_outs": entry.run_outs,
         }
 
+    # --- Lock playing XI on first detection (toss time) ---
+    locked_ids = _get_locked_ids(match)
+    if locked_ids is None and scraped_playing_ids:
+        match.locked_playing_ids = json.dumps(sorted(scraped_playing_ids))
+        locked_ids = scraped_playing_ids
+        logger.info(
+            "Match %d: locked playing XI (%d players) at first detection",
+            match.id, len(locked_ids),
+        )
+
     for player in players:
         perf = (
             db.query(PlayerMatchPerformance)
@@ -89,7 +121,10 @@ async def update_match_scores(match: Match, db: Session):
             .first()
         )
 
-        is_playing = player.id in playing_player_ids
+        # Stats update for ALL players seen in scorecard (including impact
+        # players), but is_playing is based on the FROZEN set.
+        in_scorecard = player.id in scraped_playing_ids
+        is_playing = player.id in locked_ids if locked_ids else in_scorecard
         bat = batting_by_id.get(player.id, {})
         bowl = bowling_by_id.get(player.id, {})
         fld = fielding_by_id.get(player.id, {})
@@ -126,12 +161,18 @@ async def update_match_scores(match: Match, db: Session):
         logger.info("Match %d marked as LIVE", match.id)
 
     db.flush()
-    _recalculate_match_points(match.id, db)
+    _recalculate_match_points(match, db)
     db.commit()
-    logger.info("Updated scores for match %d (%d players)", match.id, len(playing_player_ids))
+    logger.info("Updated scores for match %d (%d scraped, %s locked)",
+                match.id, len(scraped_playing_ids),
+                len(locked_ids) if locked_ids else "unlocked")
 
 
-def _is_player_playing(player_id: int, match_id: int, db: Session) -> bool:
+def _is_player_playing_locked(player_id: int, match: Match, match_id: int, db: Session) -> bool:
+    """Check if a player is in the playing XI using the frozen set."""
+    locked = _get_locked_ids(match)
+    if locked is not None:
+        return player_id in locked
     perf = (
         db.query(PlayerMatchPerformance)
         .filter(
@@ -143,16 +184,21 @@ def _is_player_playing(player_id: int, match_id: int, db: Session) -> bool:
     return perf is not None and perf.is_playing
 
 
-def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player]:
+def _build_effective_xi(ut: UserTeam, match_id: int, db: Session, match: Optional[Match] = None) -> list[Player]:
     """Build the effective playing XI after auto-substitution.
 
+    Uses the frozen playing-XI snapshot when available so that mid-match
+    changes (impact player swaps) are ignored.
+
     Rules:
-    1. If a main player is playing, keep them.
+    1. If a main player is in the locked XI, keep them.
     2. If not, try to sub with the same role first (priority order).
-    3. If no same-role sub, use any available sub that still satisfies
-       the team role constraints (min 1 per role).
+    3. If no same-role sub, use any available playing sub.
     4. If no valid sub, that slot is simply lost.
     """
+    if match is None:
+        match = db.query(Match).filter(Match.id == match_id).first()
+
     subs = (
         db.query(UserTeamSubstitute)
         .options(joinedload(UserTeamSubstitute.player))
@@ -167,7 +213,7 @@ def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player
     playing_main = []
     not_playing_main = []
     for player in ut.players:
-        if _is_player_playing(player.id, match_id, db):
+        if _is_player_playing_locked(player.id, match, match_id, db):
             playing_main.append(player)
         else:
             not_playing_main.append(player)
@@ -183,7 +229,7 @@ def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player
             if sub_entry.player_id in used_sub_ids:
                 continue
             sub_player = sub_entry.player
-            if not _is_player_playing(sub_player.id, match_id, db):
+            if not _is_player_playing_locked(sub_player.id, match, match_id, db):
                 continue
             if sub_player.role == missing_player.role:
                 replacement = sub_entry
@@ -194,7 +240,7 @@ def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player
                 if sub_entry.player_id in used_sub_ids:
                     continue
                 sub_player = sub_entry.player
-                if not _is_player_playing(sub_player.id, match_id, db):
+                if not _is_player_playing_locked(sub_player.id, match, match_id, db):
                     continue
                 replacement = sub_entry
                 break
@@ -207,7 +253,7 @@ def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player
     return effective
 
 
-def _recalculate_match_points(match_id: int, db: Session):
+def _recalculate_match_points(match: Match, db: Session):
     """Recalculate total_points for every user team in a match."""
     user_teams = (
         db.query(UserTeam)
@@ -215,19 +261,19 @@ def _recalculate_match_points(match_id: int, db: Session):
             joinedload(UserTeam.players),
             joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
         )
-        .filter(UserTeam.match_id == match_id)
+        .filter(UserTeam.match_id == match.id)
         .all()
     )
 
     for ut in user_teams:
-        effective_players = _build_effective_xi(ut, match_id, db)
+        effective_players = _build_effective_xi(ut, match.id, db, match=match)
         total = 0.0
         for player in effective_players:
             perf = (
                 db.query(PlayerMatchPerformance)
                 .filter(
                     PlayerMatchPerformance.player_id == player.id,
-                    PlayerMatchPerformance.match_id == match_id,
+                    PlayerMatchPerformance.match_id == match.id,
                 )
                 .first()
             )

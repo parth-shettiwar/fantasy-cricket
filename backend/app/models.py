@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Table,
+    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Table, Text,
     Enum as SAEnum, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -64,6 +64,7 @@ class Match(Base):
     status = Column(SAEnum(MatchStatus), default=MatchStatus.UPCOMING)
     lock_time = Column(DateTime, nullable=False)
     cricbuzz_match_id = Column(String, nullable=True)
+    locked_playing_ids = Column(Text, nullable=True)
 
     team1 = relationship("IPLTeam", foreign_keys=[team1_id])
     team2 = relationship("IPLTeam", foreign_keys=[team2_id])
