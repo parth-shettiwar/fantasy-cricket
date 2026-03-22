@@ -9,3 +9,7 @@ bcrypt==4.0.1
 httpx
 psycopg2-binary
 gunicorn
+apscheduler
+beautifulsoup4
+thefuzz
+python-Levenshtein

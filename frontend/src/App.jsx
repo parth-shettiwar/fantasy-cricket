@@ -7,6 +7,9 @@ import MatchDetail from './pages/MatchDetail'
 import Leaderboard from './pages/Leaderboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Rooms from './pages/Rooms'
+import RoomDetail from './pages/RoomDetail'
+import JoinRoom from './pages/JoinRoom'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -28,7 +31,14 @@ function App() {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(userData))
     setUser(userData)
-    navigate('/')
+
+    const pendingJoin = localStorage.getItem('pendingJoin')
+    if (pendingJoin) {
+      localStorage.removeItem('pendingJoin')
+      navigate(`/join/${pendingJoin}`)
+    } else {
+      navigate('/')
+    }
   }
 
   return (
@@ -51,6 +61,9 @@ function App() {
                 <>
                   <Link to="/my-teams" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
                     My Teams
+                  </Link>
+                  <Link to="/rooms" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
+                    Rooms
                   </Link>
                   <Link to="/leaderboard" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
                     Leaderboard
@@ -88,6 +101,9 @@ function App() {
           <Route path="/match/:matchId/select-team" element={user ? <TeamSelection /> : <Navigate to="/login" />} />
           <Route path="/match/:matchId" element={<MatchDetail />} />
           <Route path="/my-teams" element={user ? <MyTeams /> : <Navigate to="/login" />} />
+          <Route path="/rooms" element={user ? <Rooms /> : <Navigate to="/login" />} />
+          <Route path="/rooms/:roomId" element={user ? <RoomDetail /> : <Navigate to="/login" />} />
+          <Route path="/join/:inviteCode" element={<JoinRoom />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
         </Routes>
       </main>

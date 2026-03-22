@@ -1,15 +1,30 @@
+import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+
 from app.database import engine, Base
-from app.routers import auth, matches, teams, points
+from app.routers import auth, matches, teams, points, rooms, admin
+from app.services.scheduler import start_scheduler, stop_scheduler
+
+logging.basicConfig(level=logging.INFO)
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Fantasy Cricket API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title="Fantasy Cricket API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +38,8 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(points.router, prefix="/api/points", tags=["points"])
+app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.get("/api/health")

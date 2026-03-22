@@ -149,3 +149,45 @@ class LeaderboardEntry(BaseModel):
     username: str
     total_points: float
     teams_count: int
+
+
+# --- Rooms ---
+
+class RoomCreate(BaseModel):
+    name: str
+
+
+class RoomMemberResponse(BaseModel):
+    user_id: int
+    username: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RoomResponse(BaseModel):
+    id: int
+    name: str
+    invite_code: str
+    created_by: int
+    created_at: datetime
+    member_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class RoomDetailResponse(RoomResponse):
+    members: list[RoomMemberResponse]
+    creator_username: str
+
+
+# --- Admin ---
+
+class SetCricbuzzId(BaseModel):
+    cricbuzz_match_id: str
+
+
+class SetMatchStatus(BaseModel):
+    status: MatchStatus

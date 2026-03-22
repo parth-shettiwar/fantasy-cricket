@@ -1,5 +1,7 @@
+from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Table, Enum as SAEnum
+    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Table,
+    Enum as SAEnum, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -61,6 +63,7 @@ class Match(Base):
     venue = Column(String, nullable=False)
     status = Column(SAEnum(MatchStatus), default=MatchStatus.UPCOMING)
     lock_time = Column(DateTime, nullable=False)
+    cricbuzz_match_id = Column(String, nullable=True)
 
     team1 = relationship("IPLTeam", foreign_keys=[team1_id])
     team2 = relationship("IPLTeam", foreign_keys=[team2_id])
@@ -116,3 +119,31 @@ class PlayerMatchPerformance(Base):
 
     player = relationship("Player", back_populates="performances")
     match = relationship("Match", back_populates="performances")
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    invite_code = Column(String(8), unique=True, nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
+    members = relationship("RoomMember", back_populates="room", cascade="all, delete-orphan")
+
+
+class RoomMember(Base):
+    __tablename__ = "room_members"
+    __table_args__ = (
+        UniqueConstraint("room_id", "user_id", name="uq_room_user"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+
+    room = relationship("Room", back_populates="members")
+    user = relationship("User")
