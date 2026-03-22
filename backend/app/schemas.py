@@ -84,6 +84,16 @@ class UserTeamCreate(BaseModel):
     player_ids: list[int]
     captain_id: int
     vice_captain_id: int
+    substitute_ids: list[int] = []
+
+
+class SubstituteResponse(BaseModel):
+    player_id: int
+    priority: int
+    player: PlayerResponse
+
+    class Config:
+        from_attributes = True
 
 
 class UserTeamResponse(BaseModel):
@@ -94,6 +104,7 @@ class UserTeamResponse(BaseModel):
     vice_captain_id: int
     total_points: float
     players: list[PlayerResponse]
+    substitutes: list[SubstituteResponse] = []
 
     class Config:
         from_attributes = True

@@ -5,7 +5,8 @@ from collections import Counter
 
 from app.database import get_db
 from app.models import (
-    Match, MatchStatus, Player, UserTeam, user_team_players, PlayerRole, User,
+    Match, MatchStatus, Player, UserTeam, UserTeamSubstitute,
+    user_team_players, PlayerRole, User,
 )
 from app.schemas import UserTeamCreate, UserTeamResponse
 from app.routers.auth import get_current_user
@@ -71,7 +72,47 @@ def _validate_inputs(team_in: UserTeamCreate, match: Match, db: Session):
         raise HTTPException(status_code=400, detail="One or more player IDs are invalid")
 
     validate_team(players, match)
+
+    if len(team_in.substitute_ids) > 4:
+        raise HTTPException(status_code=400, detail="Maximum 4 substitutes allowed")
+    overlap = set(team_in.player_ids) & set(team_in.substitute_ids)
+    if overlap:
+        raise HTTPException(status_code=400, detail="Substitutes cannot overlap with main XI")
+    if team_in.substitute_ids:
+        valid_team_ids = {match.team1_id, match.team2_id}
+        subs = db.query(Player).filter(Player.id.in_(team_in.substitute_ids)).all()
+        if len(subs) != len(team_in.substitute_ids):
+            raise HTTPException(status_code=400, detail="One or more substitute IDs are invalid")
+        for s in subs:
+            if s.team_id not in valid_team_ids:
+                raise HTTPException(status_code=400, detail=f"Substitute {s.name} is not in either team")
+
     return players
+
+
+def _save_substitutes(user_team_id: int, substitute_ids: list[int], db: Session):
+    """Clear old subs and save new ones with priority order."""
+    db.query(UserTeamSubstitute).filter(
+        UserTeamSubstitute.user_team_id == user_team_id
+    ).delete()
+    for i, pid in enumerate(substitute_ids, start=1):
+        db.add(UserTeamSubstitute(
+            user_team_id=user_team_id,
+            player_id=pid,
+            priority=i,
+        ))
+
+
+def _load_team(team_id: int, db: Session) -> UserTeam:
+    return (
+        db.query(UserTeam)
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+        )
+        .filter(UserTeam.id == team_id)
+        .first()
+    )
 
 
 @router.post("/", response_model=UserTeamResponse)
@@ -111,16 +152,10 @@ def create_team(
             user_team_id=user_team.id, player_id=pid
         ))
 
+    _save_substitutes(user_team.id, team_in.substitute_ids, db)
     db.commit()
-    db.refresh(user_team)
 
-    user_team = (
-        db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
-        .filter(UserTeam.id == user_team.id)
-        .first()
-    )
-    return user_team
+    return _load_team(user_team.id, db)
 
 
 @router.put("/{team_id}", response_model=UserTeamResponse)
@@ -156,15 +191,10 @@ def update_team(
             user_team_id=user_team.id, player_id=pid
         ))
 
+    _save_substitutes(user_team.id, team_in.substitute_ids, db)
     db.commit()
 
-    user_team = (
-        db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
-        .filter(UserTeam.id == team_id)
-        .first()
-    )
-    return user_team
+    return _load_team(team_id, db)
 
 
 @router.get("/my/match/{match_id}", response_model=None)
@@ -176,7 +206,10 @@ def my_team_for_match(
     """Return the current user's team for a specific match, or null."""
     team = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+        )
         .filter(UserTeam.user_id == current_user.id, UserTeam.match_id == match_id)
         .first()
     )
@@ -192,7 +225,10 @@ def my_teams(
 ):
     teams = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+        )
         .filter(UserTeam.user_id == current_user.id)
         .order_by(UserTeam.id.desc())
         .all()
@@ -208,7 +244,10 @@ def get_team(
 ):
     team = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+        )
         .filter(UserTeam.id == team_id, UserTeam.user_id == current_user.id)
         .first()
     )

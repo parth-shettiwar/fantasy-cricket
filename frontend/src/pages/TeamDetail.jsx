@@ -113,6 +113,11 @@ export default function TeamDetail() {
                   {p.is_vice_captain && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 font-bold">VC</span>
                   )}
+                  {p.is_substitute && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-400 border border-amber-800 font-medium">
+                      SUB {p.replaces ? `for ${p.replaces}` : 'IN'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Points columns */}
@@ -144,6 +149,34 @@ export default function TeamDetail() {
           ))}
         </div>
       </section>
+
+      {/* Not Playing (main XI players who didn't play) */}
+      {team.not_playing?.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-red-400 mb-3">Did Not Play (substituted out)</h2>
+          <div className="flex gap-2 flex-wrap">
+            {team.not_playing.map(p => (
+              <span key={p.player_id} className="text-xs px-3 py-1.5 rounded-full bg-red-900/20 text-red-400 border border-red-900">
+                {p.name} <span className="text-gray-500">({p.role})</span>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Bench Substitutes (subs that weren't used) */}
+      {team.bench_substitutes?.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">Bench (unused substitutes)</h2>
+          <div className="flex gap-2 flex-wrap">
+            {team.bench_substitutes.map(p => (
+              <span key={p.player_id} className="text-xs px-3 py-1.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">
+                {p.priority}. {p.name} <span className="text-gray-600">({p.role})</span>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-center gap-6">

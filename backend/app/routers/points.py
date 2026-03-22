@@ -4,9 +4,10 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import (
-    UserTeam, PlayerMatchPerformance, Player, User, Match, MatchStatus,
-    user_team_players,
+    UserTeam, UserTeamSubstitute, PlayerMatchPerformance, Player, User,
+    Match, MatchStatus, user_team_players,
 )
+from app.services.scheduler import _build_effective_xi
 from app.schemas import (
     TeamPointsBreakdown, PlayerPoints, LeaderboardEntry, PerformanceResponse,
 )
@@ -295,6 +296,7 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
         db.query(UserTeam)
         .options(
             joinedload(UserTeam.players).joinedload(Player.team),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player).joinedload(Player.team),
             joinedload(UserTeam.match).joinedload(Match.team1),
             joinedload(UserTeam.match).joinedload(Match.team2),
             joinedload(UserTeam.captain),
@@ -314,8 +316,13 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.id == ut.user_id).first()
 
-    player_details = []
-    for player in ut.players:
+    effective = _build_effective_xi(ut, ut.match_id, db)
+    effective_ids = {p.id for p in effective}
+    main_ids = {p.id for p in ut.players}
+    sub_ids = {s.player_id for s in ut.substitutes}
+    subbed_in_ids = effective_ids - main_ids
+
+    def _player_detail(player, is_sub_in=False, replaces_name=None):
         perf = (
             db.query(PlayerMatchPerformance)
             .filter(
@@ -324,7 +331,6 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
             )
             .first()
         )
-
         is_cap = player.id == ut.captain_id
         is_vc = player.id == ut.vice_captain_id
         pts_data = {"batting": 0, "bowling": 0, "fielding": 0, "bonus": 0, "total": 0, "final": 0}
@@ -341,13 +347,15 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
                 "final": final,
             }
 
-        player_details.append({
+        return {
             "player_id": player.id,
             "name": player.name,
             "role": player.role.value,
             "team_short": player.team.short_name if player.team else "",
             "is_captain": is_cap,
             "is_vice_captain": is_vc,
+            "is_substitute": is_sub_in,
+            "replaces": replaces_name,
             "points": pts_data,
             "stats": {
                 "runs": perf.runs if perf else 0,
@@ -358,7 +366,33 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
                 "overs": perf.overs_bowled if perf else 0,
                 "catches": perf.catches if perf else 0,
             } if perf and perf.is_playing else None,
-        })
+        }
+
+    player_details = []
+    not_playing_main = []
+    for player in ut.players:
+        if player.id in effective_ids:
+            player_details.append(_player_detail(player))
+        else:
+            not_playing_main.append(player)
+
+    sub_idx = 0
+    for sub_player in effective:
+        if sub_player.id in subbed_in_ids:
+            replaces = not_playing_main[sub_idx].name if sub_idx < len(not_playing_main) else None
+            player_details.append(_player_detail(sub_player, is_sub_in=True, replaces_name=replaces))
+            sub_idx += 1
+
+    benched_subs = []
+    for s in ut.substitutes:
+        if s.player_id not in subbed_in_ids:
+            benched_subs.append({
+                "player_id": s.player_id,
+                "name": s.player.name,
+                "role": s.player.role.value,
+                "team_short": s.player.team.short_name if s.player.team else "",
+                "priority": s.priority,
+            })
 
     return {
         "user_team_id": ut.id,
@@ -372,4 +406,6 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
         "captain": ut.captain.name if ut.captain else "?",
         "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
         "players": sorted(player_details, key=lambda p: -p["points"]["final"]),
+        "not_playing": [{"player_id": p.id, "name": p.name, "role": p.role.value} for p in not_playing_main],
+        "bench_substitutes": benched_subs,
     }

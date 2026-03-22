@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import PlayerCard from '../components/PlayerCard'
 
-const STEPS = [
+const ROLE_STEPS = [
   { role: 'BAT',  label: 'Batsmen',        min: 1, max: 6 },
   { role: 'BOWL', label: 'Bowlers',         min: 1, max: 6 },
   { role: 'AR',   label: 'All-Rounders',    min: 1, max: 4 },
@@ -11,6 +11,10 @@ const STEPS = [
 ]
 const ROLE_LABELS = { WK: 'WK', BAT: 'BAT', AR: 'AR', BOWL: 'BOWL' }
 const MAX_CREDITS = 100
+const MAX_SUBS = 4
+
+const STEP_SUBS = ROLE_STEPS.length
+const STEP_CAPTAIN = ROLE_STEPS.length + 1
 
 export default function TeamSelection() {
   const { matchId } = useParams()
@@ -18,6 +22,7 @@ export default function TeamSelection() {
   const [match, setMatch] = useState(null)
   const [players, setPlayers] = useState([])
   const [selected, setSelected] = useState(new Set())
+  const [substitutes, setSubstitutes] = useState([])
   const [captain, setCaptain] = useState(null)
   const [viceCaptain, setViceCaptain] = useState(null)
   const [stepIdx, setStepIdx] = useState(0)
@@ -41,14 +46,23 @@ export default function TeamSelection() {
         setSelected(new Set(et.players.map(p => p.id)))
         setCaptain(et.captain_id)
         setViceCaptain(et.vice_captain_id)
+        if (et.substitutes?.length) {
+          setSubstitutes(
+            et.substitutes
+              .sort((a, b) => a.priority - b.priority)
+              .map(s => s.player_id)
+          )
+        }
       }
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [matchId])
 
   const isEditing = !!existingTeamId
-  const isCaptainStep = stepIdx >= STEPS.length
-  const currentStep = STEPS[stepIdx] || null
+  const isSubsStep = stepIdx === STEP_SUBS
+  const isCaptainStep = stepIdx === STEP_CAPTAIN
+  const isRoleStep = stepIdx < ROLE_STEPS.length
+  const currentRoleStep = isRoleStep ? ROLE_STEPS[stepIdx] : null
 
   const selectedPlayers = players.filter(p => selected.has(p.id))
 
@@ -81,11 +95,21 @@ export default function TeamSelection() {
       } else {
         if (next.size >= 11) return prev
         const roleCount = selectedPlayers.filter(p => p.role === player.role).length
-        const stepDef = STEPS.find(s => s.role === player.role)
+        const stepDef = ROLE_STEPS.find(s => s.role === player.role)
         if (stepDef && roleCount >= stepDef.max) return prev
         next.add(playerId)
       }
       return next
+    })
+  }
+
+  const toggleSubstitute = (playerId) => {
+    setSubstitutes(prev => {
+      if (prev.includes(playerId)) {
+        return prev.filter(id => id !== playerId)
+      }
+      if (prev.length >= MAX_SUBS) return prev
+      return [...prev, playerId]
     })
   }
 
@@ -95,29 +119,36 @@ export default function TeamSelection() {
     if (usedCredits + player.credits > MAX_CREDITS) return false
     if ((teamBreakdown[player.team_id] || 0) >= 7) return false
     const roleCount = roleBreakdown[player.role] || 0
-    const stepDef = STEPS.find(s => s.role === player.role)
+    const stepDef = ROLE_STEPS.find(s => s.role === player.role)
     if (stepDef && roleCount >= stepDef.max) return false
     return true
   }
 
-  const rolePlayers = currentStep
+  const rolePlayers = currentRoleStep
     ? players.filter(p => {
-        if (p.role !== currentStep.role) return false
+        if (p.role !== currentRoleStep.role) return false
         if (teamFilter !== 'ALL' && p.team_id !== parseInt(teamFilter)) return false
         return true
       })
     : []
 
+  const subsAvailablePlayers = players.filter(p => {
+    if (selected.has(p.id)) return false
+    if (teamFilter !== 'ALL' && p.team_id !== parseInt(teamFilter)) return false
+    const validTeams = match ? new Set([match.team1.id, match.team2.id]) : new Set()
+    return validTeams.has(p.team_id)
+  })
+
   const canGoNext = () => {
-    if (!currentStep) return false
-    const count = roleBreakdown[currentStep.role] || 0
-    return count >= currentStep.min
+    if (!currentRoleStep) return false
+    const count = roleBreakdown[currentRoleStep.role] || 0
+    return count >= currentRoleStep.min
   }
 
   const remainingSlots = 11 - selected.size
-  const remainingSteps = STEPS.slice(stepIdx + 1)
+  const remainingSteps = ROLE_STEPS.slice(stepIdx + 1)
   const minNeededFromLater = remainingSteps.reduce((sum, s) => sum + s.min, 0)
-  const maxForThisRole = currentStep ? Math.min(currentStep.max, remainingSlots - minNeededFromLater) : 0
+  const maxForThisRole = currentRoleStep ? Math.min(currentRoleStep.max, remainingSlots - minNeededFromLater) : 0
 
   const handleSubmit = async () => {
     setError('')
@@ -128,6 +159,7 @@ export default function TeamSelection() {
         player_ids: [...selected],
         captain_id: captain,
         vice_captain_id: viceCaptain,
+        substitute_ids: substitutes,
       }
       if (isEditing) {
         await api.put(`/teams/${existingTeamId}`, payload)
@@ -141,6 +173,8 @@ export default function TeamSelection() {
       setSubmitting(false)
     }
   }
+
+  const getTeamName = (p) => p.team_id === match?.team1?.id ? match.team1.short_name : match?.team2?.short_name
 
   if (loading) {
     return (
@@ -165,6 +199,8 @@ export default function TeamSelection() {
     )
   }
 
+  const stepLabels = [...ROLE_STEPS.map(s => s.label), 'Subs', 'C / VC']
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -178,10 +214,7 @@ export default function TeamSelection() {
             {isEditing && <span className="ml-2 text-yellow-400 font-medium">· Editing Team</span>}
           </p>
         </div>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-gray-400 hover:text-white transition-colors"
-        >
+        <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-white transition-colors">
           &larr; Back
         </button>
       </div>
@@ -189,44 +222,40 @@ export default function TeamSelection() {
       {/* Step indicator */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <div className="flex items-center gap-1 mb-3">
-          {STEPS.map((s, i) => {
-            const count = roleBreakdown[s.role] || 0
-            const isActive = i === stepIdx && !isCaptainStep
-            const isDone = i < stepIdx || isCaptainStep
+          {stepLabels.map((label, i) => {
+            const isActive = i === stepIdx
+            const isDone = i < stepIdx
+            let badge = ''
+            if (i < ROLE_STEPS.length) badge = ` (${roleBreakdown[ROLE_STEPS[i].role] || 0})`
+            else if (i === STEP_SUBS) badge = ` (${substitutes.length})`
             return (
               <button
-                key={s.role}
-                onClick={() => { if (!isCaptainStep) setStepIdx(i) }}
+                key={label}
+                onClick={() => {
+                  if (i <= STEP_SUBS && i < stepIdx) setStepIdx(i)
+                }}
                 className={`flex-1 text-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-green-600 text-white'
-                    : isDone
-                      ? 'bg-green-900/40 text-green-400 border border-green-800'
-                      : 'bg-gray-800 text-gray-500'
+                  isActive ? 'bg-green-600 text-white'
+                    : isDone ? 'bg-green-900/40 text-green-400 border border-green-800'
+                    : 'bg-gray-800 text-gray-500'
                 }`}
               >
-                {s.label.split('-')[0]}
-                <span className="ml-1 opacity-75">({count})</span>
+                {label.split('-')[0]}
+                <span className="ml-0.5 opacity-75">{badge}</span>
               </button>
             )
           })}
-          <div className={`flex-1 text-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-            isCaptainStep
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-800 text-gray-500'
-          }`}>
-            C / VC
-          </div>
         </div>
         <div className="flex items-center justify-between text-xs">
           <div className="flex gap-3">
-            {STEPS.map(s => (
-              <span key={s.role} className={`px-2 py-0.5 rounded ${
-                roleBreakdown[s.role] >= s.min ? 'text-green-400' : 'text-gray-500'
-              }`}>
+            {ROLE_STEPS.map(s => (
+              <span key={s.role} className={`px-2 py-0.5 rounded ${roleBreakdown[s.role] >= s.min ? 'text-green-400' : 'text-gray-500'}`}>
                 {ROLE_LABELS[s.role]}: {roleBreakdown[s.role]}
               </span>
             ))}
+            <span className={`px-2 py-0.5 rounded ${substitutes.length > 0 ? 'text-amber-400' : 'text-gray-500'}`}>
+              SUB: {substitutes.length}
+            </span>
           </div>
           <div className="flex items-center gap-4">
             <span className={`font-medium ${usedCredits > MAX_CREDITS ? 'text-red-400' : 'text-gray-300'}`}>
@@ -238,115 +267,159 @@ export default function TeamSelection() {
           </div>
         </div>
         <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
-          <div
-            className="bg-green-500 h-2 rounded-full transition-all"
-            style={{ width: `${(selected.size / 11) * 100}%` }}
-          ></div>
+          <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${(selected.size / 11) * 100}%` }}></div>
         </div>
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-900/50 border border-red-800 text-red-300 text-sm">
-          {error}
-        </div>
+        <div className="p-3 rounded-lg bg-red-900/50 border border-red-800 text-red-300 text-sm">{error}</div>
       )}
 
-      {/* Role selection steps */}
-      {!isCaptainStep && currentStep && (
+      {/* ===== ROLE SELECTION STEPS ===== */}
+      {isRoleStep && currentRoleStep && (
         <>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold">
-                Pick {currentStep.label}
-              </h2>
+              <h2 className="text-lg font-bold">Pick {currentRoleStep.label}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Select {currentStep.min}–{maxForThisRole} players
+                Select {currentRoleStep.min}–{maxForThisRole} players
                 <span className="ml-2">
-                  (chosen: <span className={roleBreakdown[currentStep.role] >= currentStep.min ? 'text-green-400' : 'text-amber-400'}>{roleBreakdown[currentStep.role]}</span>)
+                  (chosen: <span className={roleBreakdown[currentRoleStep.role] >= currentRoleStep.min ? 'text-green-400' : 'text-amber-400'}>{roleBreakdown[currentRoleStep.role]}</span>)
                 </span>
               </p>
             </div>
-            {/* Team filter */}
             <div className="flex bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-              <button
-                onClick={() => setTeamFilter('ALL')}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  teamFilter === 'ALL' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Both
-              </button>
-              <button
-                onClick={() => setTeamFilter(String(match.team1.id))}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  teamFilter === String(match.team1.id) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {match.team1.short_name}
-              </button>
-              <button
-                onClick={() => setTeamFilter(String(match.team2.id))}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  teamFilter === String(match.team2.id) ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {match.team2.short_name}
-              </button>
+              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
+              <button onClick={() => setTeamFilter(String(match.team1.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team1.id) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team1.short_name}</button>
+              <button onClick={() => setTeamFilter(String(match.team2.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team2.id) ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team2.short_name}</button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rolePlayers.map(player => (
-              <PlayerCard
-                key={player.id}
-                player={player}
-                selected={selected.has(player.id)}
-                disabled={!canSelect(player)}
-                teamName={player.team_id === match.team1.id ? match.team1.short_name : match.team2.short_name}
-                onClick={() => togglePlayer(player.id)}
-              />
+              <PlayerCard key={player.id} player={player} selected={selected.has(player.id)} disabled={!canSelect(player)} teamName={getTeamName(player)} onClick={() => togglePlayer(player.id)} />
             ))}
           </div>
 
-          {/* Navigation */}
           <div className="flex gap-3 sticky bottom-4">
             {stepIdx > 0 && (
-              <button
-                onClick={() => { setStepIdx(stepIdx - 1); setTeamFilter('ALL') }}
-                className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 transition-colors"
-              >
-                &larr; {STEPS[stepIdx - 1].label}
+              <button onClick={() => { setStepIdx(stepIdx - 1); setTeamFilter('ALL') }} className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 transition-colors">
+                &larr; {ROLE_STEPS[stepIdx - 1].label}
               </button>
             )}
-            {stepIdx < STEPS.length - 1 ? (
-              <button
-                onClick={() => { setStepIdx(stepIdx + 1); setTeamFilter('ALL') }}
-                disabled={!canGoNext()}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-green-600/20"
-              >
-                {STEPS[stepIdx + 1].label} &rarr;
+            {stepIdx < ROLE_STEPS.length - 1 ? (
+              <button onClick={() => { setStepIdx(stepIdx + 1); setTeamFilter('ALL') }} disabled={!canGoNext()} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-green-600/20">
+                {ROLE_STEPS[stepIdx + 1].label} &rarr;
               </button>
             ) : (
               <button
                 onClick={() => {
-                  if (selected.size !== 11) {
-                    setError(`Select exactly 11 players (you have ${selected.size})`)
-                    return
-                  }
-                  setError('')
-                  setStepIdx(STEPS.length)
+                  if (selected.size !== 11) { setError(`Select exactly 11 players (you have ${selected.size})`); return }
+                  setError(''); setStepIdx(STEP_SUBS); setTeamFilter('ALL')
                 }}
                 disabled={!canGoNext()}
                 className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-green-600/20"
               >
-                Choose Captain &amp; Vice Captain &rarr;
+                Pick Substitutes &rarr;
               </button>
             )}
           </div>
         </>
       )}
 
-      {/* Captain / Vice-Captain step */}
+      {/* ===== SUBSTITUTES STEP ===== */}
+      {isSubsStep && (
+        <>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Pick Substitutes</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Select up to {MAX_SUBS} backup players (optional) · order = priority
+              </p>
+            </div>
+            <div className="flex bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
+              <button onClick={() => setTeamFilter(String(match.team1.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team1.id) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team1.short_name}</button>
+              <button onClick={() => setTeamFilter(String(match.team2.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team2.id) ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team2.short_name}</button>
+            </div>
+          </div>
+
+          {/* Selected subs summary */}
+          {substitutes.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {substitutes.map((sid, i) => {
+                const p = players.find(pl => pl.id === sid)
+                if (!p) return null
+                return (
+                  <button key={sid} onClick={() => toggleSubstitute(sid)} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-900/30 text-amber-400 border border-amber-800 text-xs hover:bg-amber-900/50 transition-colors">
+                    <span className="font-bold w-4">{i + 1}.</span>
+                    <span>{p.name}</span>
+                    <span className="text-gray-500">{p.role}</span>
+                    <span className="opacity-60">✕</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {subsAvailablePlayers.map(player => {
+              const isSub = substitutes.includes(player.id)
+              const subIdx = substitutes.indexOf(player.id)
+              const disabled = !isSub && substitutes.length >= MAX_SUBS
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => toggleSubstitute(player.id)}
+                  disabled={disabled}
+                  className={`w-full p-4 rounded-xl border text-left transition-all ${
+                    isSub
+                      ? 'border-amber-500 bg-amber-900/20 ring-1 ring-amber-500/30'
+                      : disabled
+                        ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
+                        : 'border-gray-800 bg-gray-900 hover:border-gray-600 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                        isSub ? 'bg-amber-900/50 text-amber-400' : 'bg-gray-800 text-gray-300'
+                      }`}>
+                        {isSub ? subIdx + 1 : player.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{player.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">{player.role}</span>
+                          <span className="text-xs text-gray-500">{getTeamName(player)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className="text-sm font-semibold">{player.credits}</p>
+                      <p className="text-xs text-gray-500">credits</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex gap-3 sticky bottom-4">
+            <button onClick={() => { setStepIdx(ROLE_STEPS.length - 1); setTeamFilter('ALL') }} className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 transition-colors">
+              &larr; {ROLE_STEPS[ROLE_STEPS.length - 1].label}
+            </button>
+            <button
+              onClick={() => { setError(''); setStepIdx(STEP_CAPTAIN) }}
+              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 transition-colors shadow-lg shadow-green-600/20"
+            >
+              {substitutes.length === 0 ? 'Skip' : `${substitutes.length} Sub${substitutes.length !== 1 ? 's' : ''} Selected`} · Captain &amp; VC &rarr;
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ===== CAPTAIN / VICE-CAPTAIN STEP ===== */}
       {isCaptainStep && (
         <>
           <div className="text-center mb-4">
@@ -364,41 +437,25 @@ export default function TeamSelection() {
                 <button
                   key={player.id}
                   onClick={() => {
-                    if (isCap) {
-                      setCaptain(null)
-                    } else if (isVc) {
-                      setViceCaptain(null)
-                    } else if (!captain) {
-                      setCaptain(player.id)
-                    } else if (!viceCaptain) {
-                      setViceCaptain(player.id)
-                    }
+                    if (isCap) setCaptain(null)
+                    else if (isVc) setViceCaptain(null)
+                    else if (!captain) setCaptain(player.id)
+                    else if (!viceCaptain) setViceCaptain(player.id)
                   }}
                   className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     isCap ? 'border-yellow-500 bg-yellow-900/20 hover:bg-yellow-900/10' :
                     isVc ? 'border-blue-500 bg-blue-900/20 hover:bg-blue-900/10' :
-                    captain && viceCaptain
-                      ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
-                      : 'border-gray-800 bg-gray-900 hover:border-gray-600'
+                    captain && viceCaptain ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed' :
+                    'border-gray-800 bg-gray-900 hover:border-gray-600'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold">{player.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {player.role} · {player.team_id === match.team1.id ? match.team1.short_name : match.team2.short_name}
-                      </p>
+                      <p className="text-xs text-gray-400">{player.role} · {getTeamName(player)}</p>
                     </div>
-                    {isCap && (
-                      <span className="px-2 py-1 text-xs font-bold bg-yellow-500 text-black rounded flex items-center gap-1">
-                        C <span className="text-[10px] opacity-70">✕</span>
-                      </span>
-                    )}
-                    {isVc && (
-                      <span className="px-2 py-1 text-xs font-bold bg-blue-500 text-white rounded flex items-center gap-1">
-                        VC <span className="text-[10px] opacity-70">✕</span>
-                      </span>
-                    )}
+                    {isCap && <span className="px-2 py-1 text-xs font-bold bg-yellow-500 text-black rounded flex items-center gap-1">C <span className="text-[10px] opacity-70">✕</span></span>}
+                    {isVc && <span className="px-2 py-1 text-xs font-bold bg-blue-500 text-white rounded flex items-center gap-1">VC <span className="text-[10px] opacity-70">✕</span></span>}
                   </div>
                 </button>
               )
@@ -406,18 +463,11 @@ export default function TeamSelection() {
           </div>
 
           <div className="flex gap-3 sticky bottom-4">
-            <button
-              onClick={() => { setStepIdx(STEPS.length - 1); setCaptain(null); setViceCaptain(null) }}
-              className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 transition-colors"
-            >
-              &larr; Back to {STEPS[STEPS.length - 1].label}
+            <button onClick={() => setStepIdx(STEP_SUBS)} className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 transition-colors">
+              &larr; Back to Substitutes
             </button>
             {captain && viceCaptain && (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-50 transition-colors shadow-lg shadow-green-600/20"
-              >
+              <button onClick={handleSubmit} disabled={submitting} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-50 transition-colors shadow-lg shadow-green-600/20">
                 {submitting ? 'Saving...' : isEditing ? 'Update Team' : 'Create Team'}
               </button>
             )}

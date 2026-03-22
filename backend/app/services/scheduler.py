@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import Counter
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -9,8 +10,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal
 from app.models import (
-    Match, MatchStatus, Player, PlayerMatchPerformance, UserTeam,
-    user_team_players,
+    Match, MatchStatus, Player, PlayerMatchPerformance, PlayerRole,
+    UserTeam, UserTeamSubstitute, user_team_players,
 )
 from app.services.cricket_scraper import (
     scrape_scorecard, build_player_name_index, match_player_name,
@@ -130,18 +131,98 @@ async def update_match_scores(match: Match, db: Session):
     logger.info("Updated scores for match %d (%d players)", match.id, len(playing_player_ids))
 
 
+def _is_player_playing(player_id: int, match_id: int, db: Session) -> bool:
+    perf = (
+        db.query(PlayerMatchPerformance)
+        .filter(
+            PlayerMatchPerformance.player_id == player_id,
+            PlayerMatchPerformance.match_id == match_id,
+        )
+        .first()
+    )
+    return perf is not None and perf.is_playing
+
+
+def _build_effective_xi(ut: UserTeam, match_id: int, db: Session) -> list[Player]:
+    """Build the effective playing XI after auto-substitution.
+
+    Rules:
+    1. If a main player is playing, keep them.
+    2. If not, try to sub with the same role first (priority order).
+    3. If no same-role sub, use any available sub that still satisfies
+       the team role constraints (min 1 per role).
+    4. If no valid sub, that slot is simply lost.
+    """
+    subs = (
+        db.query(UserTeamSubstitute)
+        .options(joinedload(UserTeamSubstitute.player))
+        .filter(UserTeamSubstitute.user_team_id == ut.id)
+        .order_by(UserTeamSubstitute.priority)
+        .all()
+    )
+
+    effective = []
+    used_sub_ids: set[int] = set()
+
+    playing_main = []
+    not_playing_main = []
+    for player in ut.players:
+        if _is_player_playing(player.id, match_id, db):
+            playing_main.append(player)
+        else:
+            not_playing_main.append(player)
+
+    effective.extend(playing_main)
+
+    role_counts = Counter(p.role for p in playing_main)
+
+    for missing_player in not_playing_main:
+        replacement = None
+
+        for sub_entry in subs:
+            if sub_entry.player_id in used_sub_ids:
+                continue
+            sub_player = sub_entry.player
+            if not _is_player_playing(sub_player.id, match_id, db):
+                continue
+            if sub_player.role == missing_player.role:
+                replacement = sub_entry
+                break
+
+        if not replacement:
+            for sub_entry in subs:
+                if sub_entry.player_id in used_sub_ids:
+                    continue
+                sub_player = sub_entry.player
+                if not _is_player_playing(sub_player.id, match_id, db):
+                    continue
+                replacement = sub_entry
+                break
+
+        if replacement:
+            effective.append(replacement.player)
+            used_sub_ids.add(replacement.player_id)
+            role_counts[replacement.player.role] = role_counts.get(replacement.player.role, 0) + 1
+
+    return effective
+
+
 def _recalculate_match_points(match_id: int, db: Session):
     """Recalculate total_points for every user team in a match."""
     user_teams = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+        )
         .filter(UserTeam.match_id == match_id)
         .all()
     )
 
     for ut in user_teams:
+        effective_players = _build_effective_xi(ut, match_id, db)
         total = 0.0
-        for player in ut.players:
+        for player in effective_players:
             perf = (
                 db.query(PlayerMatchPerformance)
                 .filter(

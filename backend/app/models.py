@@ -96,6 +96,28 @@ class UserTeam(Base):
     captain = relationship("Player", foreign_keys=[captain_id])
     vice_captain = relationship("Player", foreign_keys=[vice_captain_id])
     players = relationship("Player", secondary=user_team_players)
+    substitutes = relationship(
+        "UserTeamSubstitute",
+        back_populates="user_team",
+        cascade="all, delete-orphan",
+        order_by="UserTeamSubstitute.priority",
+    )
+
+
+class UserTeamSubstitute(Base):
+    __tablename__ = "user_team_substitutes"
+    __table_args__ = (
+        UniqueConstraint("user_team_id", "player_id", name="uq_sub_team_player"),
+        UniqueConstraint("user_team_id", "priority", name="uq_sub_team_priority"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_team_id = Column(Integer, ForeignKey("user_teams.id", ondelete="CASCADE"), nullable=False)
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False)
+    priority = Column(Integer, nullable=False)
+
+    user_team = relationship("UserTeam", back_populates="substitutes")
+    player = relationship("Player")
 
 
 class PlayerMatchPerformance(Base):
