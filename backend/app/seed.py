@@ -1,11 +1,25 @@
 """Seed the database with IPL 2026 teams, players, and sample matches."""
 import random
 from datetime import datetime, timedelta
+from sqlalchemy import inspect, text
 from app.database import engine, SessionLocal, Base
 from app.models import (
     IPLTeam, Player, Match, PlayerMatchPerformance,
     PlayerRole, MatchStatus,
 )
+
+
+def run_migrations():
+    """Add columns that were introduced after the initial schema."""
+    inspector = inspect(engine)
+    if "matches" in inspector.get_table_names():
+        columns = {c["name"] for c in inspector.get_columns("matches")}
+        if "cricbuzz_match_id" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE matches ADD COLUMN cricbuzz_match_id VARCHAR"
+                ))
+                print("Migration: added cricbuzz_match_id to matches")
 
 TEAMS = [
     ("Mumbai Indians", "MI"),
@@ -313,6 +327,7 @@ def generate_mock_performance(player: Player, match, is_playing: bool) -> dict:
 
 def seed():
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     db = SessionLocal()
 
     try:
