@@ -353,7 +353,7 @@ export default function TeamSelection() {
             <h2 className="text-xl font-bold">
               {!captain ? 'Choose your Captain (2x points)' : !viceCaptain ? 'Choose your Vice Captain (1.5x points)' : 'Captain & Vice Captain selected!'}
             </h2>
-            <p className="text-sm text-gray-400 mt-1">Tap a player to select</p>
+            <p className="text-sm text-gray-400 mt-1">Tap to select · tap again to change</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -364,18 +364,23 @@ export default function TeamSelection() {
                 <button
                   key={player.id}
                   onClick={() => {
-                    if (!captain) {
+                    if (isCap) {
+                      setCaptain(null)
+                    } else if (isVc) {
+                      setViceCaptain(null)
+                    } else if (!captain) {
                       setCaptain(player.id)
-                    } else if (!viceCaptain && player.id !== captain) {
+                    } else if (!viceCaptain) {
                       setViceCaptain(player.id)
                     }
                   }}
-                  disabled={isCap || isVc}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    isCap ? 'border-yellow-500 bg-yellow-900/20' :
-                    isVc ? 'border-blue-500 bg-blue-900/20' :
-                    'border-gray-800 bg-gray-900 hover:border-gray-600'
-                  } ${isCap || isVc ? '' : 'cursor-pointer'}`}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    isCap ? 'border-yellow-500 bg-yellow-900/20 hover:bg-yellow-900/10' :
+                    isVc ? 'border-blue-500 bg-blue-900/20 hover:bg-blue-900/10' :
+                    captain && viceCaptain
+                      ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
+                      : 'border-gray-800 bg-gray-900 hover:border-gray-600'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -384,8 +389,16 @@ export default function TeamSelection() {
                         {player.role} · {player.team_id === match.team1.id ? match.team1.short_name : match.team2.short_name}
                       </p>
                     </div>
-                    {isCap && <span className="px-2 py-1 text-xs font-bold bg-yellow-500 text-black rounded">C</span>}
-                    {isVc && <span className="px-2 py-1 text-xs font-bold bg-blue-500 text-white rounded">VC</span>}
+                    {isCap && (
+                      <span className="px-2 py-1 text-xs font-bold bg-yellow-500 text-black rounded flex items-center gap-1">
+                        C <span className="text-[10px] opacity-70">✕</span>
+                      </span>
+                    )}
+                    {isVc && (
+                      <span className="px-2 py-1 text-xs font-bold bg-blue-500 text-white rounded flex items-center gap-1">
+                        VC <span className="text-[10px] opacity-70">✕</span>
+                      </span>
+                    )}
                   </div>
                 </button>
               )
