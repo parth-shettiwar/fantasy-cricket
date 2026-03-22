@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.so
+backend/venv/
+backend/*.db
+node_modules/
+frontend/dist/
+.env
+*.egg-info/
