@@ -64,31 +64,53 @@ export default function UserProfile() {
               <span className="text-right">Status</span>
             </div>
 
-            {profile.teams.map(team => (
-              <Link
-                key={team.user_team_id}
-                to={`/team/${team.user_team_id}`}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr_80px_80px] gap-1 sm:gap-3 px-5 py-4 items-center border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
-              >
-                <span className="font-medium text-sm">{team.match_name}</span>
-                <span className="text-xs text-gray-500">
-                  {new Date(team.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-                <div className="text-xs">
-                  <span className="text-orange-400">{team.captain}</span>
-                  <span className="text-gray-600 mx-1">/</span>
-                  <span className="text-cyan-400">{team.vice_captain}</span>
-                </div>
-                <span className="text-right font-semibold text-green-400 text-sm">
-                  {team.total_points.toFixed(1)}
-                </span>
-                <div className="text-right">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_BADGE[team.match_status] || STATUS_BADGE.upcoming}`}>
-                    {team.match_status.toUpperCase()}
+            {profile.teams.map(team => {
+              if (!team.locked) {
+                return (
+                  <div
+                    key={team.user_team_id}
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr_80px_80px] gap-1 sm:gap-3 px-5 py-4 items-center border-b border-gray-800/50"
+                  >
+                    <span className="font-medium text-sm">{team.match_name}</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(team.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                    <span className="text-xs text-gray-500 italic">Hidden until match starts</span>
+                    <span className="text-right text-gray-600 text-sm">-</span>
+                    <div className="text-right">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_BADGE[team.match_status] || STATUS_BADGE.upcoming}`}>
+                        {team.match_status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <Link
+                  key={team.user_team_id}
+                  to={`/team/${team.user_team_id}`}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr_80px_80px] gap-1 sm:gap-3 px-5 py-4 items-center border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                >
+                  <span className="font-medium text-sm">{team.match_name}</span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(team.match_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
-                </div>
-              </Link>
-            ))}
+                  <div className="text-xs">
+                    <span className="text-orange-400">{team.captain}</span>
+                    <span className="text-gray-600 mx-1">/</span>
+                    <span className="text-cyan-400">{team.vice_captain}</span>
+                  </div>
+                  <span className="text-right font-semibold text-green-400 text-sm">
+                    {team.total_points.toFixed(1)}
+                  </span>
+                  <div className="text-right">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_BADGE[team.match_status] || STATUS_BADGE.upcoming}`}>
+                      {team.match_status.toUpperCase()}
+                    </span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         )}
       </section>

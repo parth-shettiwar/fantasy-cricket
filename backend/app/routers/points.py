@@ -4,7 +4,8 @@ from sqlalchemy import func
 
 from app.database import get_db
 from app.models import (
-    UserTeam, PlayerMatchPerformance, Player, User, Match, user_team_players,
+    UserTeam, PlayerMatchPerformance, Player, User, Match, MatchStatus,
+    user_team_players,
 )
 from app.schemas import (
     TeamPointsBreakdown, PlayerPoints, LeaderboardEntry, PerformanceResponse,
@@ -162,7 +163,15 @@ def match_performances(match_id: int, db: Session = Depends(get_db)):
 
 @router.get("/match/{match_id}/leaderboard")
 def match_leaderboard(match_id: int, db: Session = Depends(get_db)):
-    """Leaderboard for a single match: all submitted teams ranked by points."""
+    """Leaderboard for a single match.
+
+    Before match starts: only shows usernames (team submitted = yes).
+    After match starts (live/completed): shows full details.
+    """
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
     teams = (
         db.query(UserTeam)
         .options(joinedload(UserTeam.players), joinedload(UserTeam.captain), joinedload(UserTeam.vice_captain))
@@ -172,21 +181,36 @@ def match_leaderboard(match_id: int, db: Session = Depends(get_db)):
         .all()
     )
 
+    locked = match.status != MatchStatus.UPCOMING
+
     result = []
     for ut in teams:
         user = db.query(User).filter(User.id == ut.user_id).first()
-        result.append({
+        entry = {
             "user_team_id": ut.id,
             "user_id": ut.user_id,
             "username": user.username if user else "?",
-            "captain": ut.captain.name if ut.captain else "?",
-            "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
-            "total_points": ut.total_points,
-            "players": [
-                {"id": p.id, "name": p.name, "role": p.role.value, "team_short": p.team.short_name if p.team else ""}
-                for p in ut.players
-            ],
-        })
+            "locked": locked,
+        }
+        if locked:
+            entry.update({
+                "captain": ut.captain.name if ut.captain else "?",
+                "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
+                "total_points": ut.total_points,
+                "players": [
+                    {"id": p.id, "name": p.name, "role": p.role.value, "team_short": p.team.short_name if p.team else ""}
+                    for p in ut.players
+                ],
+            })
+        else:
+            entry.update({
+                "captain": None,
+                "vice_captain": None,
+                "total_points": None,
+                "players": [],
+            })
+        result.append(entry)
+
     return result
 
 
@@ -230,31 +254,43 @@ def user_profile(user_id: int, db: Session = Depends(get_db)):
 
     overall_points = sum(ut.total_points for ut in teams)
 
+    team_entries = []
+    for ut in teams:
+        started = ut.match and ut.match.status != MatchStatus.UPCOMING
+        entry = {
+            "user_team_id": ut.id,
+            "match_id": ut.match_id,
+            "match_name": f"{ut.match.team1.short_name} vs {ut.match.team2.short_name}" if ut.match else "?",
+            "match_date": ut.match.date.isoformat() if ut.match else "",
+            "match_status": ut.match.status.value if ut.match else "",
+            "venue": ut.match.venue if ut.match else "",
+            "locked": started,
+        }
+        if started:
+            entry["captain"] = ut.captain.name if ut.captain else "?"
+            entry["vice_captain"] = ut.vice_captain.name if ut.vice_captain else "?"
+            entry["total_points"] = ut.total_points
+        else:
+            entry["captain"] = None
+            entry["vice_captain"] = None
+            entry["total_points"] = None
+        team_entries.append(entry)
+
     return {
         "user_id": user.id,
         "username": user.username,
         "total_points": overall_points,
         "matches_played": len(teams),
-        "teams": [
-            {
-                "user_team_id": ut.id,
-                "match_id": ut.match_id,
-                "match_name": f"{ut.match.team1.short_name} vs {ut.match.team2.short_name}" if ut.match else "?",
-                "match_date": ut.match.date.isoformat() if ut.match else "",
-                "match_status": ut.match.status.value if ut.match else "",
-                "venue": ut.match.venue if ut.match else "",
-                "captain": ut.captain.name if ut.captain else "?",
-                "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
-                "total_points": ut.total_points,
-            }
-            for ut in teams
-        ],
+        "teams": team_entries,
     }
 
 
 @router.get("/user-team/{user_team_id}/detail")
 def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
-    """Public view of any user's team with per-player points breakdown."""
+    """Public view of any user's team with per-player points breakdown.
+
+    Blocked for upcoming matches to prevent team copying.
+    """
     ut = (
         db.query(UserTeam)
         .options(
@@ -269,6 +305,12 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
     )
     if not ut:
         raise HTTPException(status_code=404, detail="Team not found")
+
+    if ut.match and ut.match.status == MatchStatus.UPCOMING:
+        raise HTTPException(
+            status_code=403,
+            detail="Team details are hidden until the match starts",
+        )
 
     user = db.query(User).filter(User.id == ut.user_id).first()
 

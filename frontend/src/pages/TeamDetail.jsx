@@ -13,11 +13,18 @@ export default function TeamDetail() {
   const { teamId } = useParams()
   const [team, setTeam] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [hidden, setHidden] = useState(false)
 
   useEffect(() => {
     api.get(`/points/user-team/${teamId}/detail`)
       .then(res => setTeam(res.data))
-      .catch(console.error)
+      .catch(err => {
+        if (err.response?.status === 403) {
+          setHidden(true)
+        } else {
+          console.error(err)
+        }
+      })
       .finally(() => setLoading(false))
   }, [teamId])
 
@@ -25,6 +32,19 @@ export default function TeamDetail() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+      </div>
+    )
+  }
+
+  if (hidden) {
+    return (
+      <div className="text-center py-20 space-y-4">
+        <div className="text-5xl">🔒</div>
+        <h2 className="text-xl font-bold text-gray-300">Team Hidden</h2>
+        <p className="text-gray-500">Team details will be revealed once the match starts.</p>
+        <Link to="/" className="inline-block mt-4 text-sm text-green-400 hover:text-green-300 transition-colors">
+          &larr; Back to matches
+        </Link>
       </div>
     )
   }

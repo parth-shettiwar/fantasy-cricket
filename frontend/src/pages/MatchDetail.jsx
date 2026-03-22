@@ -132,16 +132,36 @@ export default function MatchDetail() {
           </p>
         ) : (
           <div>
-            <div className="grid grid-cols-[40px_1fr_1fr_1fr_80px] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
-              <span>#</span>
-              <span>User</span>
-              <span>Captain</span>
-              <span>Vice Captain</span>
-              <span className="text-right">Points</span>
-            </div>
+            {matchTeams[0]?.locked ? (
+              <div className="grid grid-cols-[40px_1fr_1fr_1fr_80px] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+                <span>#</span>
+                <span>User</span>
+                <span>Captain</span>
+                <span>Vice Captain</span>
+                <span className="text-right">Points</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[40px_1fr] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+                <span>#</span>
+                <span>User</span>
+              </div>
+            )}
             {matchTeams.map((entry, i) => {
               const rank = i + 1
               const isExpanded = expandedTeam === entry.user_team_id
+
+              if (!entry.locked) {
+                return (
+                  <div key={entry.user_team_id} className="grid grid-cols-[40px_1fr] gap-3 px-5 py-3 items-center border-b border-gray-800/50">
+                    <span className="font-bold text-gray-500">{rank}</span>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/user/${entry.user_id}`} className="font-medium text-sm hover:text-green-400 transition-colors">{entry.username}</Link>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-900/30 text-green-400 border border-green-800">Team Submitted</span>
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <div key={entry.user_team_id}>
                   <div
@@ -166,7 +186,6 @@ export default function MatchDetail() {
                     </Link>
                   </div>
 
-                  {/* Expandable player list */}
                   {isExpanded && (
                     <div className="px-5 py-3 bg-gray-800/40 border-b border-gray-800/50">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
