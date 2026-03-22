@@ -1,8 +1,11 @@
-"""Scrape live cricket scorecard data from Cricbuzz."""
+"""Scrape live cricket scorecard data from Cricbuzz embedded JSON."""
+from __future__ import annotations
 
+import json
 import re
 import logging
 from dataclasses import dataclass, field
+from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -10,8 +13,7 @@ from thefuzz import process as fuzz_process
 
 logger = logging.getLogger(__name__)
 
-CRICBUZZ_BASE = "https://www.cricbuzz.com"
-SCORECARD_URL = f"{CRICBUZZ_BASE}/live-cricket-scorecard/{{match_id}}"
+CRICBUZZ_SCORECARD_URL = "https://www.cricbuzz.com/live-cricket-scorecard/{match_id}"
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -29,7 +31,9 @@ class BattingEntry:
     balls: int = 0
     fours: int = 0
     sixes: int = 0
-    dismissal: str = ""
+    out_desc: str = ""
+    wicket_code: str = ""
+    fielder_name: str = ""
 
 
 @dataclass
@@ -58,59 +62,91 @@ class ScorecardData:
     is_complete: bool = False
 
 
-def _safe_int(val: str) -> int:
-    try:
-        return int(val.strip().replace("*", ""))
-    except (ValueError, AttributeError):
-        return 0
+def _extract_innings_json(html: str) -> list[dict]:
+    """Extract innings data from Cricbuzz Next.js embedded JSON."""
+    innings_list = []
+
+    pattern = re.compile(
+        r'\\"matchId\\":\d+,\\"inningsId\\":(\d+),\\"timeScore\\":\d+,'
+        r'\\"batTeamDetails\\":(.*?),\\"bowlTeamDetails\\":(.*?)(?:,\\"partnershipsData|,\\"ppData|\\"extras)'
+    )
+
+    # The data is double-escaped JSON inside script tags. Let's find all innings blocks.
+    # Strategy: find all "inningsId" occurrences and extract the surrounding JSON
+    bat_team_pattern = re.compile(
+        r'\"batsmenData\":\{((?:\"bat_\d+\":\{[^}]+\},?)+)\}'
+    )
+    bowl_team_pattern = re.compile(
+        r'\"bowlersData\":\{((?:\"bowl_\d+\":\{[^}]+\},?)+)\}'
+    )
+
+    # First, unescape the double-escaped JSON
+    unescaped = html.replace('\\"', '"').replace('\\\\', '\\')
+
+    # Find all innings blocks by looking for inningsId pattern
+    innings_pattern = re.compile(
+        r'"inningsId":(\d+),"timeScore":\d+,"batTeamDetails":\{[^}]*"batsmenData":\{(.*?)\},"bowlTeamDetails":\{[^}]*"bowlersData":\{(.*?)\}'
+    )
+
+    # Simpler approach: find individual batsman and bowler entries
+    bat_entries = re.findall(
+        r'"bat_\d+":\{"batId":\d+,"batName":"([^"]+)"[^}]*"runs":(\d+),"balls":(\d+),'
+        r'[^}]*"fours":(\d+),"sixes":(\d+),[^}]*"outDesc":"([^"]*)"[^}]*'
+        r'"wicketCode":"([^"]*)"',
+        unescaped,
+    )
+
+    bowl_entries = re.findall(
+        r'"bowl_\d+":\{"bowlerId":\d+,"bowlName":"([^"]+)"[^}]*'
+        r'"overs":([\d.]+),"maidens":(\d+),"runs":(\d+),"wickets":(\d+)',
+        unescaped,
+    )
+
+    # Find match status
+    status_match = re.search(r'"status":"([^"]+)"', unescaped)
+    result_match = re.search(r'"resultType":"([^"]+)"', unescaped)
+
+    return {
+        "batting": bat_entries,
+        "bowling": bowl_entries,
+        "status": status_match.group(1) if status_match else "",
+        "result_type": result_match.group(1) if result_match else "",
+    }
 
 
-def _safe_float(val: str) -> float:
-    try:
-        return float(val.strip())
-    except (ValueError, AttributeError):
-        return 0.0
+def _extract_fielding_from_dismissal(out_desc: str, fielding: dict):
+    """Parse fielding contributions from dismissal descriptions like 'c Shaheen Afridi b Salman Agha'."""
+    if not out_desc:
+        return
 
-
-def _normalize_name(name: str) -> str:
-    """Strip annotations like (c), (wk), *, leading/trailing whitespace."""
-    name = re.sub(r"\s*\(.*?\)", "", name)
-    name = name.replace("*", "").replace("†", "").strip()
-    return name
-
-
-def _parse_fielding_from_dismissal(dismissal: str, fielding: dict[str, FieldingEntry]):
-    """Extract fielder names from dismissal descriptions like 'c Smith b Jones'."""
-    dismissal = dismissal.strip()
-
-    caught = re.match(r"c\s+(.+?)\s+b\s+", dismissal)
+    caught = re.match(r"c\s+(.+?)\s+b\s+", out_desc)
     if caught:
-        name = _normalize_name(caught.group(1))
-        if name and name.lower() not in ("sub", "†"):
+        name = caught.group(1).strip()
+        if name and name.lower() not in ("sub",):
             fielding.setdefault(name, FieldingEntry(name=name))
             fielding[name].catches += 1
 
-    if "st " in dismissal.lower():
-        st = re.match(r"st\s+(.+?)\s+b\s+", dismissal)
+    if out_desc.startswith("st "):
+        st = re.match(r"st\s+(.+?)\s+b\s+", out_desc)
         if st:
-            name = _normalize_name(st.group(1))
+            name = st.group(1).strip()
             if name:
                 fielding.setdefault(name, FieldingEntry(name=name))
                 fielding[name].stumpings += 1
 
-    if "run out" in dismissal.lower():
-        ro = re.search(r"run out\s*\((.+?)\)", dismissal)
+    if "run out" in out_desc.lower():
+        ro = re.search(r"run out\s*\((.+?)\)", out_desc)
         if ro:
-            names = [_normalize_name(n) for n in ro.group(1).split("/")]
+            names = [n.strip() for n in ro.group(1).split("/")]
             for name in names:
                 if name:
                     fielding.setdefault(name, FieldingEntry(name=name))
                     fielding[name].run_outs += 1
 
 
-async def scrape_scorecard(cricbuzz_match_id: str) -> ScorecardData | None:
+async def scrape_scorecard(cricbuzz_match_id: str) -> Optional[ScorecardData]:
     """Scrape full scorecard from Cricbuzz for a given match ID."""
-    url = SCORECARD_URL.format(match_id=cricbuzz_match_id)
+    url = CRICBUZZ_SCORECARD_URL.format(match_id=cricbuzz_match_id)
     logger.info("Scraping scorecard from %s", url)
 
     try:
@@ -124,79 +160,66 @@ async def scrape_scorecard(cricbuzz_match_id: str) -> ScorecardData | None:
     soup = BeautifulSoup(resp.text, "html.parser")
     data = ScorecardData()
 
-    status_el = soup.select_one(".cb-col.cb-col-100.cb-min-stts")
-    if status_el:
-        data.match_status = status_el.get_text(strip=True)
-        if any(kw in data.match_status.lower() for kw in ("won", "tied", "draw", "no result")):
-            data.is_complete = True
+    # Find the large script tag with embedded match data
+    raw_json_text = ""
+    for script in soup.find_all("script"):
+        text = script.string or ""
+        if "batName" in text and len(text) > 10000:
+            raw_json_text = text
+            break
 
-    batting_tables = soup.select("div.cb-col.cb-col-100.cb-ltst-wgt")
+    if not raw_json_text:
+        logger.warning("No embedded match data found for match %s", cricbuzz_match_id)
+        return None
 
-    for section in batting_tables:
-        rows = section.select("div.cb-col.cb-col-100.cb-scrd-itms")
-        for row in rows:
-            cols = row.select("div.cb-col")
-            if len(cols) < 7:
-                continue
+    extracted = _extract_innings_json(raw_json_text)
 
-            name_el = cols[0].select_one("a")
-            if not name_el:
-                continue
+    data.match_status = extracted["status"]
+    if extracted["result_type"] in ("win", "tie", "draw", "no_result"):
+        data.is_complete = True
 
-            name = _normalize_name(name_el.get_text(strip=True))
-            if not name or name.lower() in ("extras", "total", "did not bat"):
-                continue
-
-            dismissal_text = ""
-            dismissal_el = cols[1] if len(cols) > 1 else None
-            if dismissal_el:
-                dismissal_text = dismissal_el.get_text(strip=True)
-
-            entry = BattingEntry(
-                name=name,
-                runs=_safe_int(cols[2].get_text()) if len(cols) > 2 else 0,
-                balls=_safe_int(cols[3].get_text()) if len(cols) > 3 else 0,
-                fours=_safe_int(cols[4].get_text()) if len(cols) > 4 else 0,
-                sixes=_safe_int(cols[5].get_text()) if len(cols) > 5 else 0,
-                dismissal=dismissal_text,
-            )
-            data.batting.append(entry)
-
-            _parse_fielding_from_dismissal(dismissal_text, data.fielding)
-
-    bowling_sections = soup.select("div.cb-col.cb-col-100.cb-ltst-wgt")
-    for section in bowling_sections:
-        header = section.select_one("div.cb-col.cb-col-100.cb-scrd-hdr")
-        if not header:
+    seen_batters = set()
+    for name, runs, balls, fours, sixes, out_desc, wicket_code in extracted["batting"]:
+        if name in seen_batters:
             continue
-        header_text = header.get_text(strip=True).lower()
-        if "bowling" not in header_text:
+        seen_batters.add(name)
+        data.batting.append(BattingEntry(
+            name=name,
+            runs=int(runs),
+            balls=int(balls),
+            fours=int(fours),
+            sixes=int(sixes),
+            out_desc=out_desc,
+            wicket_code=wicket_code,
+        ))
+        _extract_fielding_from_dismissal(out_desc, data.fielding)
+
+    seen_bowlers = set()
+    for name, overs, maidens, runs, wickets in extracted["bowling"]:
+        if name in seen_bowlers:
             continue
+        seen_bowlers.add(name)
+        data.bowling.append(BowlingEntry(
+            name=name,
+            overs=float(overs),
+            maidens=int(maidens),
+            runs_conceded=int(runs),
+            wickets=int(wickets),
+        ))
 
-        rows = section.select("div.cb-col.cb-col-100.cb-scrd-itms")
-        for row in rows:
-            cols = row.select("div.cb-col")
-            if len(cols) < 5:
-                continue
-
-            name_el = cols[0].select_one("a")
-            if not name_el:
-                continue
-
-            name = _normalize_name(name_el.get_text(strip=True))
-            if not name:
-                continue
-
-            entry = BowlingEntry(
-                name=name,
-                overs=_safe_float(cols[1].get_text()) if len(cols) > 1 else 0,
-                maidens=_safe_int(cols[2].get_text()) if len(cols) > 2 else 0,
-                runs_conceded=_safe_int(cols[3].get_text()) if len(cols) > 3 else 0,
-                wickets=_safe_int(cols[4].get_text()) if len(cols) > 4 else 0,
-            )
-            data.bowling.append(entry)
-
+    logger.info(
+        "Scraped match %s: %d batters, %d bowlers, %d fielders, complete=%s",
+        cricbuzz_match_id, len(data.batting), len(data.bowling),
+        len(data.fielding), data.is_complete,
+    )
     return data
+
+
+def _normalize_name(name: str) -> str:
+    """Strip annotations like (c), (wk), *, leading/trailing whitespace."""
+    name = re.sub(r"\s*\(.*?\)", "", name)
+    name = name.replace("*", "").replace("†", "").strip()
+    return name
 
 
 def build_player_name_index(players: list) -> dict[str, int]:
@@ -208,7 +231,7 @@ def build_player_name_index(players: list) -> dict[str, int]:
     return index
 
 
-def match_player_name(scraped_name: str, name_index: dict[str, int]) -> int | None:
+def match_player_name(scraped_name: str, name_index: dict[str, int]) -> Optional[int]:
     """Fuzzy-match a scraped player name to our DB player ID."""
     normalized = _normalize_name(scraped_name).lower()
 
