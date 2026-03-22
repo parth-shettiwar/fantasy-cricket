@@ -6,15 +6,24 @@ import MatchCard from '../components/MatchCard'
 export default function Home() {
   const [matches, setMatches] = useState([])
   const [teamCounts, setTeamCounts] = useState({})
+  const [myMatchIds, setMyMatchIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
+    const token = localStorage.getItem('token')
+    const fetches = [
       api.get('/matches/'),
       api.get('/points/team-counts'),
-    ]).then(([matchRes, countsRes]) => {
+    ]
+    if (token) {
+      fetches.push(api.get('/teams/my').catch(() => ({ data: [] })))
+    }
+    Promise.all(fetches).then(([matchRes, countsRes, myTeamsRes]) => {
       setMatches(matchRes.data)
       setTeamCounts(countsRes.data)
+      if (myTeamsRes?.data) {
+        setMyMatchIds(new Set(myTeamsRes.data.map(t => t.match_id)))
+      }
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -45,7 +54,7 @@ export default function Home() {
             Live Matches
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {live.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
+            {live.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
           </div>
         </section>
       )}
@@ -54,7 +63,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-green-400 mb-4">Upcoming Matches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcoming.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
+            {upcoming.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
           </div>
         </section>
       )}
@@ -63,7 +72,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-gray-400 mb-4">Completed Matches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {completed.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
+            {completed.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
           </div>
         </section>
       )}

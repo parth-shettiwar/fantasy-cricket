@@ -92,9 +92,18 @@ export default function MyTeams() {
                         {match && ` \u00B7 ${match.status.toUpperCase()}`}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-1">
                       <p className="text-lg font-bold text-green-400">{team.total_points.toFixed(1)}</p>
                       <p className="text-xs text-gray-500">points</p>
+                      {match?.status === 'upcoming' && (
+                        <Link
+                          to={`/match/${team.match_id}/select-team`}
+                          className="text-[10px] px-3 py-1 rounded-full bg-yellow-900/40 text-yellow-400 border border-yellow-800 hover:bg-yellow-900/60 transition-colors"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Edit Team
+                        </Link>
+                      )}
                     </div>
                   </div>
 

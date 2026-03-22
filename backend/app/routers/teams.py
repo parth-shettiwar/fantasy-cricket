@@ -5,11 +5,10 @@ from collections import Counter
 
 from app.database import get_db
 from app.models import (
-    Match, Player, UserTeam, user_team_players, PlayerRole
+    Match, MatchStatus, Player, UserTeam, user_team_players, PlayerRole, User,
 )
 from app.schemas import UserTeamCreate, UserTeamResponse
 from app.routers.auth import get_current_user
-from app.models import User
 
 router = APIRouter()
 
@@ -52,15 +51,10 @@ def validate_team(players: list[Player], match: Match):
             raise HTTPException(status_code=400, detail=f"Player {p.name} is not in either team for this match")
 
 
-@router.post("/", response_model=UserTeamResponse)
-def create_team(
-    team_in: UserTeamCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    match = db.query(Match).filter(Match.id == team_in.match_id).first()
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+def _validate_inputs(team_in: UserTeamCreate, match: Match, db: Session):
+    """Shared validation for create and update."""
+    if match.status != MatchStatus.UPCOMING:
+        raise HTTPException(status_code=400, detail="Cannot modify team after match has started")
 
     if datetime.utcnow() > match.lock_time:
         raise HTTPException(status_code=400, detail="Team selection is locked for this match")
@@ -77,6 +71,31 @@ def create_team(
         raise HTTPException(status_code=400, detail="One or more player IDs are invalid")
 
     validate_team(players, match)
+    return players
+
+
+@router.post("/", response_model=UserTeamResponse)
+def create_team(
+    team_in: UserTeamCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    match = db.query(Match).filter(Match.id == team_in.match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    existing = (
+        db.query(UserTeam)
+        .filter(UserTeam.user_id == current_user.id, UserTeam.match_id == team_in.match_id)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a team for this match. Use edit instead.",
+        )
+
+    _validate_inputs(team_in, match, db)
 
     user_team = UserTeam(
         user_id=current_user.id,
@@ -102,6 +121,68 @@ def create_team(
         .first()
     )
     return user_team
+
+
+@router.put("/{team_id}", response_model=UserTeamResponse)
+def update_team(
+    team_id: int,
+    team_in: UserTeamCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_team = (
+        db.query(UserTeam)
+        .filter(UserTeam.id == team_id, UserTeam.user_id == current_user.id)
+        .first()
+    )
+    if not user_team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    match = db.query(Match).filter(Match.id == user_team.match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    _validate_inputs(team_in, match, db)
+
+    db.execute(
+        user_team_players.delete().where(user_team_players.c.user_team_id == team_id)
+    )
+
+    user_team.captain_id = team_in.captain_id
+    user_team.vice_captain_id = team_in.vice_captain_id
+
+    for pid in team_in.player_ids:
+        db.execute(user_team_players.insert().values(
+            user_team_id=user_team.id, player_id=pid
+        ))
+
+    db.commit()
+
+    user_team = (
+        db.query(UserTeam)
+        .options(joinedload(UserTeam.players))
+        .filter(UserTeam.id == team_id)
+        .first()
+    )
+    return user_team
+
+
+@router.get("/my/match/{match_id}", response_model=None)
+def my_team_for_match(
+    match_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the current user's team for a specific match, or null."""
+    team = (
+        db.query(UserTeam)
+        .options(joinedload(UserTeam.players))
+        .filter(UserTeam.user_id == current_user.id, UserTeam.match_id == match_id)
+        .first()
+    )
+    if not team:
+        return None
+    return UserTeamResponse.model_validate(team)
 
 
 @router.get("/my", response_model=list[UserTeamResponse])

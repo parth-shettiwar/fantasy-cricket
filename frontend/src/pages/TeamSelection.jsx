@@ -21,14 +21,23 @@ export default function TeamSelection() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [existingTeamId, setExistingTeamId] = useState(null)
 
   useEffect(() => {
     Promise.all([
       api.get(`/matches/${matchId}`),
       api.get(`/matches/${matchId}/players`),
-    ]).then(([matchRes, playersRes]) => {
+      api.get(`/teams/my/match/${matchId}`).catch(() => ({ data: null })),
+    ]).then(([matchRes, playersRes, existingRes]) => {
       setMatch(matchRes.data)
       setPlayers(playersRes.data)
+      if (existingRes.data) {
+        const et = existingRes.data
+        setExistingTeamId(et.id)
+        setSelected(new Set(et.players.map(p => p.id)))
+        setCaptain(et.captain_id)
+        setViceCaptain(et.vice_captain_id)
+      }
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [matchId])
@@ -79,19 +88,26 @@ export default function TeamSelection() {
     return true
   })
 
+  const isEditing = !!existingTeamId
+
   const handleSubmit = async () => {
     setError('')
     setSubmitting(true)
     try {
-      await api.post('/teams/', {
+      const payload = {
         match_id: parseInt(matchId),
         player_ids: [...selected],
         captain_id: captain,
         vice_captain_id: viceCaptain,
-      })
+      }
+      if (isEditing) {
+        await api.put(`/teams/${existingTeamId}`, payload)
+      } else {
+        await api.post('/teams/', payload)
+      }
       navigate('/my-teams')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create team')
+      setError(err.response?.data?.detail || 'Failed to save team')
     } finally {
       setSubmitting(false)
     }
@@ -107,6 +123,19 @@ export default function TeamSelection() {
 
   if (!match) return <p className="text-red-400">Match not found</p>
 
+  if (match.status !== 'upcoming') {
+    return (
+      <div className="text-center py-20 space-y-4">
+        <div className="text-5xl">🔒</div>
+        <h2 className="text-xl font-bold text-gray-300">Team Locked</h2>
+        <p className="text-gray-500">You cannot create or edit teams after the match has started.</p>
+        <button onClick={() => navigate(-1)} className="inline-block mt-4 text-sm text-green-400 hover:text-green-300 transition-colors">
+          &larr; Go back
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -114,7 +143,10 @@ export default function TeamSelection() {
           <h1 className="text-2xl font-bold">
             {match.team1.short_name} vs {match.team2.short_name}
           </h1>
-          <p className="text-sm text-gray-400 mt-1">{match.venue}</p>
+          <p className="text-sm text-gray-400 mt-1">
+            {match.venue}
+            {isEditing && <span className="ml-2 text-yellow-400 font-medium">· Editing Team</span>}
+          </p>
         </div>
         <button
           onClick={() => navigate(-1)}
@@ -288,7 +320,7 @@ export default function TeamSelection() {
                 disabled={submitting}
                 className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-50 transition-colors shadow-lg shadow-green-600/20"
               >
-                {submitting ? 'Creating...' : 'Create Team'}
+                {submitting ? 'Saving...' : isEditing ? 'Update Team' : 'Create Team'}
               </button>
             )}
           </div>

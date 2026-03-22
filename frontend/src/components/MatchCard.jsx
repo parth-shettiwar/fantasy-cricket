@@ -19,7 +19,7 @@ const STATUS_STYLES = {
   completed: 'bg-gray-800/50 text-gray-400 border-gray-700',
 }
 
-export default function MatchCard({ match, teamCount = 0 }) {
+export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
   const [countdown, setCountdown] = useState(getCountdown(match.lock_time))
 
   useEffect(() => {
@@ -88,9 +88,13 @@ export default function MatchCard({ match, teamCount = 0 }) {
           {!isLocked && (
             <Link
               to={`/match/${match.id}/select-team`}
-              className="text-sm px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-500 transition-colors"
+              className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+                hasTeam
+                  ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-800 hover:bg-yellow-900/70'
+                  : 'bg-green-600 text-white hover:bg-green-500'
+              }`}
             >
-              Create Team
+              {hasTeam ? 'Edit Team' : 'Create Team'}
             </Link>
           )}
         </div>
