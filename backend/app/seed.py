@@ -312,11 +312,15 @@ def generate_mock_performance(player: Player, match, is_playing: bool) -> dict:
 
 
 def seed():
-    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
+        existing = db.query(IPLTeam).first()
+        if existing:
+            print("Database already seeded, skipping.")
+            return
+
         # Create teams
         team_objects = {}
         for name, short in TEAMS:
