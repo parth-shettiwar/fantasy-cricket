@@ -158,3 +158,51 @@ def match_performances(match_id: int, db: Session = Depends(get_db)):
         .all()
     )
     return perfs
+
+
+@router.get("/match/{match_id}/leaderboard")
+def match_leaderboard(match_id: int, db: Session = Depends(get_db)):
+    """Leaderboard for a single match: all submitted teams ranked by points."""
+    teams = (
+        db.query(UserTeam)
+        .options(joinedload(UserTeam.players), joinedload(UserTeam.captain), joinedload(UserTeam.vice_captain))
+        .join(User, User.id == UserTeam.user_id)
+        .filter(UserTeam.match_id == match_id)
+        .order_by(UserTeam.total_points.desc())
+        .all()
+    )
+
+    result = []
+    for ut in teams:
+        user = db.query(User).filter(User.id == ut.user_id).first()
+        result.append({
+            "user_team_id": ut.id,
+            "user_id": ut.user_id,
+            "username": user.username if user else "?",
+            "captain": ut.captain.name if ut.captain else "?",
+            "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
+            "total_points": ut.total_points,
+            "players": [
+                {"id": p.id, "name": p.name, "role": p.role.value, "team_short": p.team.short_name if p.team else ""}
+                for p in ut.players
+            ],
+        })
+    return result
+
+
+@router.get("/match/{match_id}/team-count")
+def match_team_count(match_id: int, db: Session = Depends(get_db)):
+    """How many users have submitted teams for a match."""
+    count = db.query(func.count(UserTeam.id)).filter(UserTeam.match_id == match_id).scalar()
+    return {"match_id": match_id, "team_count": count}
+
+
+@router.get("/team-counts")
+def all_team_counts(db: Session = Depends(get_db)):
+    """Team counts for all matches (used by home page)."""
+    rows = (
+        db.query(UserTeam.match_id, func.count(UserTeam.id))
+        .group_by(UserTeam.match_id)
+        .all()
+    )
+    return {str(mid): cnt for mid, cnt in rows}

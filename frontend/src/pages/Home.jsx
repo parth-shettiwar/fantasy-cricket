@@ -5,12 +5,17 @@ import MatchCard from '../components/MatchCard'
 
 export default function Home() {
   const [matches, setMatches] = useState([])
+  const [teamCounts, setTeamCounts] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/matches/')
-      .then(res => setMatches(res.data))
-      .catch(console.error)
+    Promise.all([
+      api.get('/matches/'),
+      api.get('/points/team-counts'),
+    ]).then(([matchRes, countsRes]) => {
+      setMatches(matchRes.data)
+      setTeamCounts(countsRes.data)
+    }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
@@ -40,7 +45,7 @@ export default function Home() {
             Live Matches
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {live.map(match => <MatchCard key={match.id} match={match} />)}
+            {live.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
           </div>
         </section>
       )}
@@ -49,7 +54,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-green-400 mb-4">Upcoming Matches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcoming.map(match => <MatchCard key={match.id} match={match} />)}
+            {upcoming.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
           </div>
         </section>
       )}
@@ -58,7 +63,7 @@ export default function Home() {
         <section>
           <h2 className="text-lg font-semibold text-gray-400 mb-4">Completed Matches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {completed.map(match => <MatchCard key={match.id} match={match} />)}
+            {completed.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} />)}
           </div>
         </section>
       )}

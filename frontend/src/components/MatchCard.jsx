@@ -19,7 +19,7 @@ const STATUS_STYLES = {
   completed: 'bg-gray-800/50 text-gray-400 border-gray-700',
 }
 
-export default function MatchCard({ match }) {
+export default function MatchCard({ match, teamCount = 0 }) {
   const [countdown, setCountdown] = useState(getCountdown(match.lock_time))
 
   useEffect(() => {
@@ -68,7 +68,15 @@ export default function MatchCard({ match }) {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 text-center mb-4">{match.venue}</p>
+      <p className="text-xs text-gray-500 text-center mb-2">{match.venue}</p>
+
+      {teamCount > 0 && (
+        <p className="text-xs text-center mb-3">
+          <Link to={`/match/${match.id}`} className="text-cyan-400 hover:text-cyan-300 transition-colors">
+            {teamCount} team{teamCount !== 1 ? 's' : ''} joined
+          </Link>
+        </p>
+      )}
 
       {match.status === 'upcoming' && (
         <div className="flex items-center justify-between">
@@ -85,6 +93,17 @@ export default function MatchCard({ match }) {
               Create Team
             </Link>
           )}
+        </div>
+      )}
+
+      {match.status === 'live' && (
+        <div className="flex items-center justify-center">
+          <Link
+            to={`/match/${match.id}`}
+            className="text-sm px-4 py-2 rounded-lg bg-red-900/50 text-red-300 hover:bg-red-900/70 transition-colors border border-red-800"
+          >
+            View Live
+          </Link>
         </div>
       )}
 

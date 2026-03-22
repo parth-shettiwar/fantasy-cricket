@@ -14,6 +14,8 @@ export default function MatchDetail() {
   const [match, setMatch] = useState(null)
   const [performances, setPerformances] = useState([])
   const [players, setPlayers] = useState({})
+  const [matchTeams, setMatchTeams] = useState([])
+  const [expandedTeam, setExpandedTeam] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -21,12 +23,14 @@ export default function MatchDetail() {
       api.get(`/matches/${matchId}`),
       api.get(`/points/match/${matchId}/performances`),
       api.get(`/matches/${matchId}/players`),
-    ]).then(([matchRes, perfRes, playersRes]) => {
+      api.get(`/points/match/${matchId}/leaderboard`),
+    ]).then(([matchRes, perfRes, playersRes, teamsRes]) => {
       setMatch(matchRes.data)
       setPerformances(perfRes.data)
       const pmap = {}
       playersRes.data.forEach(p => { pmap[p.id] = p })
       setPlayers(pmap)
+      setMatchTeams(teamsRes.data)
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [matchId])
@@ -95,20 +99,105 @@ export default function MatchDetail() {
             {new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full border ${
-          match.status === 'completed' ? 'bg-gray-800/50 text-gray-400 border-gray-700' : 'bg-green-900/50 text-green-400 border-green-800'
-        }`}>
-          {match.status.toUpperCase()}
-        </span>
+        <div className="flex items-center gap-3">
+          {match.status === 'upcoming' && (
+            <Link
+              to={`/match/${matchId}/select-team`}
+              className="text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium"
+            >
+              Create Team
+            </Link>
+          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full border ${
+            match.status === 'completed' ? 'bg-gray-800/50 text-gray-400 border-gray-700' :
+            match.status === 'live' ? 'bg-red-900/50 text-red-400 border-red-800 animate-pulse' :
+            'bg-green-900/50 text-green-400 border-green-800'
+          }`}>
+            {match.status.toUpperCase()}
+          </span>
+        </div>
       </div>
 
-      {playingPerfs.length === 0 ? (
-        <p className="text-gray-400">No performance data available for this match yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {renderPerformanceTable(team1Perfs, match.team1.name)}
-          {renderPerformanceTable(team2Perfs, match.team2.name)}
+      {/* Match Leaderboard — Teams Submitted */}
+      <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-300">
+            Fantasy Teams ({matchTeams.length} submitted)
+          </h2>
         </div>
+
+        {matchTeams.length === 0 ? (
+          <p className="text-gray-500 text-sm px-5 py-6 text-center">
+            No teams submitted yet. Be the first!
+          </p>
+        ) : (
+          <div>
+            <div className="grid grid-cols-[40px_1fr_1fr_1fr_80px] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+              <span>#</span>
+              <span>User</span>
+              <span>Captain</span>
+              <span>Vice Captain</span>
+              <span className="text-right">Points</span>
+            </div>
+            {matchTeams.map((entry, i) => {
+              const rank = i + 1
+              const isExpanded = expandedTeam === entry.user_team_id
+              return (
+                <div key={entry.user_team_id}>
+                  <div
+                    onClick={() => setExpandedTeam(isExpanded ? null : entry.user_team_id)}
+                    className={`grid grid-cols-[40px_1fr_1fr_1fr_80px] gap-3 px-5 py-3 items-center border-b border-gray-800/50 cursor-pointer hover:bg-gray-800/30 transition-colors ${
+                      rank <= 3 ? 'bg-gray-800/20' : ''
+                    }`}
+                  >
+                    <span className={`font-bold ${
+                      rank === 1 ? 'text-yellow-400' :
+                      rank === 2 ? 'text-gray-300' :
+                      rank === 3 ? 'text-amber-600' :
+                      'text-gray-500'
+                    }`}>
+                      {rank}
+                    </span>
+                    <span className="font-medium text-sm">{entry.username}</span>
+                    <span className="text-sm text-orange-400">{entry.captain}</span>
+                    <span className="text-sm text-cyan-400">{entry.vice_captain}</span>
+                    <span className="text-right font-semibold text-green-400 text-sm">
+                      {entry.total_points.toFixed(1)}
+                    </span>
+                  </div>
+
+                  {/* Expandable player list */}
+                  {isExpanded && (
+                    <div className="px-5 py-3 bg-gray-800/40 border-b border-gray-800/50">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {entry.players.map(p => (
+                          <div key={p.id} className="flex items-center gap-2 text-xs py-1">
+                            <span className={`${ROLE_COLORS[p.role] || 'text-gray-400'} font-medium w-7`}>
+                              {p.role}
+                            </span>
+                            <span className="text-gray-300 truncate">{p.name}</span>
+                            <span className="text-gray-600 text-[10px]">{p.team_short}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Performance Data (only if match has started) */}
+      {playingPerfs.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-300">Scorecard</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {renderPerformanceTable(team1Perfs, match.team1.name)}
+            {renderPerformanceTable(team2Perfs, match.team2.name)}
+          </div>
+        </section>
       )}
 
       <div className="flex justify-center">
