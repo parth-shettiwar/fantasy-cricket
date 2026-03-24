@@ -124,11 +124,18 @@ export default function CricketBanner() {
               transition: `${action.imgStyle.transition}, opacity 0.2s, filter 0.2s`,
             }}
           >
-            <img
-              src="/assets/kohli.png"
-              alt="Kohli"
-              className="w-[85px] h-[105px] object-contain"
-            />
+            <div
+              className="inline-block origin-bottom"
+              style={{ animation: 'headAlive 2.8s ease-in-out infinite' }}
+            >
+              <img
+                src="/assets/kohli-caricature.png"
+                alt="Player"
+                className="w-[76px] h-[108px] object-contain object-bottom"
+                width={226}
+                height={320}
+              />
+            </div>
 
             {/* Bat */}
             <div
@@ -292,6 +299,13 @@ export default function CricketBanner() {
           50% { right: 40%; top: 8%; }
           90% { opacity: 0.6; }
           100% { right: 10%; top: 45%; opacity: 0; transform: rotate(-540deg); }
+        }
+
+        @keyframes headAlive {
+          0%, 100% { transform: scale(1) rotate(-1deg); }
+          25% { transform: scale(1.028) rotate(1.5deg); }
+          50% { transform: scale(1.018) rotate(-0.5deg); }
+          75% { transform: scale(1.032) rotate(2deg); }
         }
       `}</style>
     </div>
