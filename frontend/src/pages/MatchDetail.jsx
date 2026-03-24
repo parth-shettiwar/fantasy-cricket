@@ -6,7 +6,7 @@ const ROLE_COLORS = {
   WK: 'text-yellow-400',
   BAT: 'text-blue-400',
   AR: 'text-purple-400',
-  BOWL: 'text-green-400',
+  BOWL: 'text-emerald-400',
 }
 
 export default function MatchDetail() {
@@ -38,7 +38,7 @@ export default function MatchDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -70,12 +70,12 @@ export default function MatchDetail() {
                 <span className="truncate">{player?.name || '?'}</span>
                 <span className={`text-xs ${ROLE_COLORS[player?.role] || ''}`}>{player?.role}</span>
               </div>
-              <span className={`text-right ${perf.runs >= 50 ? 'text-green-400 font-semibold' : 'text-gray-300'}`}>
+              <span className={`text-right ${perf.runs >= 50 ? 'text-pink-400 font-semibold' : 'text-gray-300'}`}>
                 {perf.runs}{perf.runs >= 100 ? '*' : ''}
               </span>
               <span className="text-right text-gray-300">{perf.fours}</span>
               <span className="text-right text-gray-300">{perf.sixes}</span>
-              <span className={`text-right ${perf.wickets >= 3 ? 'text-green-400 font-semibold' : 'text-gray-300'}`}>
+              <span className={`text-right ${perf.wickets >= 3 ? 'text-pink-400 font-semibold' : 'text-gray-300'}`}>
                 {perf.wickets}
               </span>
               <span className="text-right text-gray-300">{perf.overs_bowled}</span>
@@ -103,7 +103,7 @@ export default function MatchDetail() {
           {match.status === 'upcoming' && (
             <Link
               to={`/match/${matchId}/select-team`}
-              className="text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors font-medium"
             >
               Create Team
             </Link>
@@ -111,14 +111,14 @@ export default function MatchDetail() {
           <span className={`text-xs px-2.5 py-1 rounded-full border ${
             match.status === 'completed' ? 'bg-gray-800/50 text-gray-400 border-gray-700' :
             match.status === 'live' ? 'bg-red-900/50 text-red-400 border-red-800 animate-pulse' :
-            'bg-green-900/50 text-green-400 border-green-800'
+            'bg-pink-900/40 text-pink-400 border-pink-800'
           }`}>
             {match.status.toUpperCase()}
           </span>
         </div>
       </div>
 
-      {/* Match Leaderboard — Teams Submitted */}
+      {/* Match Leaderboard */}
       <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-300">
@@ -155,8 +155,8 @@ export default function MatchDetail() {
                   <div key={entry.user_team_id} className="grid grid-cols-[40px_1fr] gap-3 px-5 py-3 items-center border-b border-gray-800/50">
                     <span className="font-bold text-gray-500">{rank}</span>
                     <div className="flex items-center gap-2">
-                      <Link to={`/user/${entry.user_id}`} className="font-medium text-sm hover:text-green-400 transition-colors">{entry.username}</Link>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-900/30 text-green-400 border border-green-800">Team Submitted</span>
+                      <Link to={`/user/${entry.user_id}`} className="font-medium text-sm hover:text-pink-400 transition-colors">{entry.username}</Link>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-900/30 text-pink-400 border border-pink-800">Team Submitted</span>
                     </div>
                   </div>
                 )
@@ -167,7 +167,7 @@ export default function MatchDetail() {
                   <div
                     onClick={() => setExpandedTeam(isExpanded ? null : entry.user_team_id)}
                     className={`grid grid-cols-[40px_1fr_1fr_1fr_80px] gap-3 px-5 py-3 items-center border-b border-gray-800/50 cursor-pointer hover:bg-gray-800/30 transition-colors ${
-                      rank <= 3 ? 'bg-gray-800/20' : ''
+                      rank <= 3 ? 'bg-pink-900/10' : ''
                     }`}
                   >
                     <span className={`font-bold ${
@@ -178,10 +178,10 @@ export default function MatchDetail() {
                     }`}>
                       {rank}
                     </span>
-                    <Link to={`/user/${entry.user_id}`} onClick={e => e.stopPropagation()} className="font-medium text-sm hover:text-green-400 transition-colors">{entry.username}</Link>
+                    <Link to={`/user/${entry.user_id}`} onClick={e => e.stopPropagation()} className="font-medium text-sm hover:text-pink-400 transition-colors">{entry.username}</Link>
                     <span className="text-sm text-orange-400">{entry.captain}</span>
                     <span className="text-sm text-cyan-400">{entry.vice_captain}</span>
-                    <Link to={`/team/${entry.user_team_id}`} onClick={e => e.stopPropagation()} className="text-right font-semibold text-green-400 text-sm hover:text-green-300 transition-colors">
+                    <Link to={`/team/${entry.user_team_id}`} onClick={e => e.stopPropagation()} className="text-right font-semibold text-pink-400 text-sm hover:text-pink-300 transition-colors">
                       {entry.total_points.toFixed(1)}
                     </Link>
                   </div>
@@ -208,7 +208,6 @@ export default function MatchDetail() {
         )}
       </section>
 
-      {/* Performance Data (only if match has started) */}
       {playingPerfs.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-300">Scorecard</h2>

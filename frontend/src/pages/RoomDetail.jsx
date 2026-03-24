@@ -46,7 +46,7 @@ export default function RoomDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -73,7 +73,6 @@ export default function RoomDetail() {
         </button>
       </div>
 
-      {/* Share link */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
         <p className="text-sm text-gray-400 mb-2">Share this link with friends to invite them:</p>
         <div className="flex items-center gap-3">
@@ -84,14 +83,13 @@ export default function RoomDetail() {
           />
           <button
             onClick={copyLink}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors text-sm font-medium whitespace-nowrap"
+            className="px-4 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors text-sm font-medium whitespace-nowrap"
           >
             {copied ? 'Copied!' : 'Copy Link'}
           </button>
         </div>
       </div>
 
-      {/* Room leaderboard */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Room Leaderboard</h2>
         {leaderboard.length === 0 ? (
@@ -111,7 +109,7 @@ export default function RoomDetail() {
                 <div
                   key={entry.user_id}
                   className={`grid grid-cols-[60px_1fr_100px_80px] gap-4 px-5 py-4 items-center border-b border-gray-800/50 ${
-                    rank <= 3 ? 'bg-gray-800/30' : ''
+                    rank <= 3 ? 'bg-pink-900/10' : ''
                   }`}
                 >
                   <span className={`font-bold ${
@@ -122,8 +120,8 @@ export default function RoomDetail() {
                   }`}>
                     #{rank}
                   </span>
-                  <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-green-400 transition-colors">{entry.username}</Link>
-                  <span className="text-right font-semibold text-green-400">{entry.total_points.toFixed(1)}</span>
+                  <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-pink-400 transition-colors">{entry.username}</Link>
+                  <span className="text-right font-semibold text-pink-400">{entry.total_points.toFixed(1)}</span>
                   <span className="text-right text-gray-400">{entry.teams_count}</span>
                 </div>
               )
@@ -132,15 +130,14 @@ export default function RoomDetail() {
         )}
       </div>
 
-      {/* Members */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Members</h2>
         <div className="bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
           {room.members.map(member => (
             <div key={member.user_id} className="px-5 py-3 flex items-center justify-between">
-              <Link to={`/user/${member.user_id}`} className="font-medium hover:text-green-400 transition-colors">{member.username}</Link>
+              <Link to={`/user/${member.user_id}`} className="font-medium hover:text-pink-400 transition-colors">{member.username}</Link>
               {member.user_id === room.created_by && (
-                <span className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded-full">Admin</span>
+                <span className="text-xs bg-pink-900/30 text-pink-400 px-2 py-0.5 rounded-full">Admin</span>
               )}
             </div>
           ))}

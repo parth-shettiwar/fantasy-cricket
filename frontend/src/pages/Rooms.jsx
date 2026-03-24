@@ -37,7 +37,7 @@ export default function Rooms() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -48,7 +48,7 @@ export default function Rooms() {
         <h1 className="text-2xl font-bold">My Rooms</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium text-sm"
+          className="px-4 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors font-medium text-sm"
         >
           + Create Room
         </button>
@@ -63,7 +63,7 @@ export default function Rooms() {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="e.g. Office IPL League"
-              className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-green-500"
+              className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-pink-500"
               autoFocus
             />
           </div>
@@ -71,7 +71,7 @@ export default function Rooms() {
             <button
               type="submit"
               disabled={creating}
-              className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium text-sm disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors font-medium text-sm disabled:opacity-50"
             >
               {creating ? 'Creating...' : 'Create'}
             </button>
@@ -98,7 +98,7 @@ export default function Rooms() {
             <Link
               key={room.id}
               to={`/rooms/${room.id}`}
-              className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition-colors block"
+              className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-pink-800/50 transition-colors block"
             >
               <div className="flex items-center justify-between">
                 <div>

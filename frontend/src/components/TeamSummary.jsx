@@ -32,13 +32,13 @@ export default function TeamSummary({ breakdown }) {
           <span className="text-right text-gray-300">{pp.bowling_points}</span>
           <span className="text-right text-gray-300">{pp.fielding_points}</span>
           <span className="text-right text-gray-300">{pp.total_points}</span>
-          <span className={`text-right font-semibold ${pp.final_points > 0 ? 'text-green-400' : pp.final_points < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+          <span className={`text-right font-semibold ${pp.final_points > 0 ? 'text-pink-400' : pp.final_points < 0 ? 'text-red-400' : 'text-gray-400'}`}>
             {pp.final_points.toFixed(1)}
           </span>
         </div>
       ))}
       <div className="flex justify-end pt-2 border-t border-gray-800 mt-2">
-        <span className="text-lg font-bold text-green-400">
+        <span className="text-lg font-bold text-pink-400">
           Total: {breakdown.total_points.toFixed(1)}
         </span>
       </div>

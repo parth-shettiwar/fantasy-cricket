@@ -52,7 +52,7 @@ export default function MyTeams() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -64,7 +64,7 @@ export default function MyTeams() {
       {teams.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-gray-400 mb-4">You haven't created any teams yet.</p>
-          <Link to="/" className="px-6 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-500 transition-colors">
+          <Link to="/" className="px-6 py-2 rounded-lg bg-pink-600 text-white font-medium hover:bg-pink-500 transition-colors">
             Browse Matches
           </Link>
         </div>
@@ -93,7 +93,7 @@ export default function MyTeams() {
                       </p>
                     </div>
                     <div className="text-right flex flex-col items-end gap-1">
-                      <p className="text-lg font-bold text-green-400">{team.total_points.toFixed(1)}</p>
+                      <p className="text-lg font-bold text-pink-400">{team.total_points.toFixed(1)}</p>
                       <p className="text-xs text-gray-500">points</p>
                       {match?.status === 'upcoming' && (
                         <Link
@@ -132,7 +132,7 @@ export default function MyTeams() {
                     {match?.status === 'completed' && (
                       <button
                         onClick={() => recalculate(team.id)}
-                        className="mb-3 text-xs px-3 py-1.5 rounded-lg bg-blue-900/50 text-blue-400 border border-blue-800 hover:bg-blue-900 transition-colors"
+                        className="mb-3 text-xs px-3 py-1.5 rounded-lg bg-pink-900/40 text-pink-400 border border-pink-800 hover:bg-pink-900/60 transition-colors"
                       >
                         Recalculate Points
                       </button>

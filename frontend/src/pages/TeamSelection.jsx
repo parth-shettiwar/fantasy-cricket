@@ -179,7 +179,7 @@ export default function TeamSelection() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -192,7 +192,7 @@ export default function TeamSelection() {
         <div className="text-5xl">🔒</div>
         <h2 className="text-xl font-bold text-gray-300">Team Locked</h2>
         <p className="text-gray-500">You cannot create or edit teams after the match has started.</p>
-        <button onClick={() => navigate(-1)} className="inline-block mt-4 text-sm text-green-400 hover:text-green-300 transition-colors">
+        <button onClick={() => navigate(-1)} className="inline-block mt-4 text-sm text-pink-400 hover:text-pink-300 transition-colors">
           &larr; Go back
         </button>
       </div>
@@ -203,7 +203,6 @@ export default function TeamSelection() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -219,7 +218,6 @@ export default function TeamSelection() {
         </button>
       </div>
 
-      {/* Step indicator */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <div className="flex items-center gap-1 mb-3">
           {stepLabels.map((label, i) => {
@@ -235,8 +233,8 @@ export default function TeamSelection() {
                   if (i <= STEP_SUBS && i < stepIdx) setStepIdx(i)
                 }}
                 className={`flex-1 text-center py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                  isActive ? 'bg-green-600 text-white'
-                    : isDone ? 'bg-green-900/40 text-green-400 border border-green-800'
+                  isActive ? 'bg-pink-600 text-white'
+                    : isDone ? 'bg-pink-900/40 text-pink-400 border border-pink-800'
                     : 'bg-gray-800 text-gray-500'
                 }`}
               >
@@ -249,7 +247,7 @@ export default function TeamSelection() {
         <div className="flex items-center justify-between text-xs">
           <div className="flex gap-3">
             {ROLE_STEPS.map(s => (
-              <span key={s.role} className={`px-2 py-0.5 rounded ${roleBreakdown[s.role] >= s.min ? 'text-green-400' : 'text-gray-500'}`}>
+              <span key={s.role} className={`px-2 py-0.5 rounded ${roleBreakdown[s.role] >= s.min ? 'text-pink-400' : 'text-gray-500'}`}>
                 {ROLE_LABELS[s.role]}: {roleBreakdown[s.role]}
               </span>
             ))}
@@ -261,13 +259,13 @@ export default function TeamSelection() {
             <span className={`font-medium ${usedCredits > MAX_CREDITS ? 'text-red-400' : 'text-gray-300'}`}>
               {usedCredits.toFixed(1)} / {MAX_CREDITS} cr
             </span>
-            <span className={`font-medium ${selected.size === 11 ? 'text-green-400' : 'text-gray-300'}`}>
+            <span className={`font-medium ${selected.size === 11 ? 'text-pink-400' : 'text-gray-300'}`}>
               {selected.size} / 11
             </span>
           </div>
         </div>
         <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
-          <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${(selected.size / 11) * 100}%` }}></div>
+          <div className="bg-pink-500 h-2 rounded-full transition-all" style={{ width: `${(selected.size / 11) * 100}%` }}></div>
         </div>
       </div>
 
@@ -275,7 +273,6 @@ export default function TeamSelection() {
         <div className="p-3 rounded-lg bg-red-900/50 border border-red-800 text-red-300 text-sm">{error}</div>
       )}
 
-      {/* ===== ROLE SELECTION STEPS ===== */}
       {isRoleStep && currentRoleStep && (
         <>
           <div className="flex items-center justify-between">
@@ -284,12 +281,12 @@ export default function TeamSelection() {
               <p className="text-xs text-gray-500 mt-0.5">
                 Select {currentRoleStep.min}–{maxForThisRole} players
                 <span className="ml-2">
-                  (chosen: <span className={roleBreakdown[currentRoleStep.role] >= currentRoleStep.min ? 'text-green-400' : 'text-amber-400'}>{roleBreakdown[currentRoleStep.role]}</span>)
+                  (chosen: <span className={roleBreakdown[currentRoleStep.role] >= currentRoleStep.min ? 'text-pink-400' : 'text-amber-400'}>{roleBreakdown[currentRoleStep.role]}</span>)
                 </span>
               </p>
             </div>
             <div className="flex bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
+              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
               <button onClick={() => setTeamFilter(String(match.team1.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team1.id) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team1.short_name}</button>
               <button onClick={() => setTeamFilter(String(match.team2.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team2.id) ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team2.short_name}</button>
             </div>
@@ -308,7 +305,7 @@ export default function TeamSelection() {
               </button>
             )}
             {stepIdx < ROLE_STEPS.length - 1 ? (
-              <button onClick={() => { setStepIdx(stepIdx + 1); setTeamFilter('ALL') }} disabled={!canGoNext()} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-green-600/20">
+              <button onClick={() => { setStepIdx(stepIdx + 1); setTeamFilter('ALL') }} disabled={!canGoNext()} className="flex-1 py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-pink-600/20">
                 {ROLE_STEPS[stepIdx + 1].label} &rarr;
               </button>
             ) : (
@@ -318,7 +315,7 @@ export default function TeamSelection() {
                   setError(''); setStepIdx(STEP_SUBS); setTeamFilter('ALL')
                 }}
                 disabled={!canGoNext()}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-green-600/20"
+                className="flex-1 py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-pink-600/20"
               >
                 Pick Substitutes &rarr;
               </button>
@@ -327,7 +324,6 @@ export default function TeamSelection() {
         </>
       )}
 
-      {/* ===== SUBSTITUTES STEP ===== */}
       {isSubsStep && (
         <>
           <div className="flex items-center justify-between">
@@ -338,13 +334,12 @@ export default function TeamSelection() {
               </p>
             </div>
             <div className="flex bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
+              <button onClick={() => setTeamFilter('ALL')} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === 'ALL' ? 'bg-pink-600 text-white' : 'text-gray-400 hover:text-white'}`}>Both</button>
               <button onClick={() => setTeamFilter(String(match.team1.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team1.id) ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team1.short_name}</button>
               <button onClick={() => setTeamFilter(String(match.team2.id))} className={`px-3 py-1.5 text-xs font-medium transition-colors ${teamFilter === String(match.team2.id) ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>{match.team2.short_name}</button>
             </div>
           </div>
 
-          {/* Selected subs summary */}
           {substitutes.length > 0 && (
             <div className="flex gap-2 flex-wrap">
               {substitutes.map((sid, i) => {
@@ -377,7 +372,7 @@ export default function TeamSelection() {
                       ? 'border-amber-500 bg-amber-900/20 ring-1 ring-amber-500/30'
                       : disabled
                         ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
-                        : 'border-gray-800 bg-gray-900 hover:border-gray-600 cursor-pointer'
+                        : 'border-gray-800 bg-gray-900 hover:border-pink-800/50 cursor-pointer'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -411,7 +406,7 @@ export default function TeamSelection() {
             </button>
             <button
               onClick={() => { setError(''); setStepIdx(STEP_CAPTAIN) }}
-              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 transition-colors shadow-lg shadow-green-600/20"
+              className="flex-1 py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-500 transition-colors shadow-lg shadow-pink-600/20"
             >
               {substitutes.length === 0 ? 'Skip' : `${substitutes.length} Sub${substitutes.length !== 1 ? 's' : ''} Selected`} · Captain &amp; VC &rarr;
             </button>
@@ -419,7 +414,6 @@ export default function TeamSelection() {
         </>
       )}
 
-      {/* ===== CAPTAIN / VICE-CAPTAIN STEP ===== */}
       {isCaptainStep && (
         <>
           <div className="text-center mb-4">
@@ -446,7 +440,7 @@ export default function TeamSelection() {
                     isCap ? 'border-yellow-500 bg-yellow-900/20 hover:bg-yellow-900/10' :
                     isVc ? 'border-blue-500 bg-blue-900/20 hover:bg-blue-900/10' :
                     captain && viceCaptain ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed' :
-                    'border-gray-800 bg-gray-900 hover:border-gray-600'
+                    'border-gray-800 bg-gray-900 hover:border-pink-800/50'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -467,7 +461,7 @@ export default function TeamSelection() {
               &larr; Back to Substitutes
             </button>
             {captain && viceCaptain && (
-              <button onClick={handleSubmit} disabled={submitting} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-500 disabled:opacity-50 transition-colors shadow-lg shadow-green-600/20">
+              <button onClick={handleSubmit} disabled={submitting} className="flex-1 py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-500 disabled:opacity-50 transition-colors shadow-lg shadow-pink-600/20">
                 {submitting ? 'Saving...' : isEditing ? 'Update Team' : 'Create Team'}
               </button>
             )}

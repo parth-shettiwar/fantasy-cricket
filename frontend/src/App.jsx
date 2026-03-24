@@ -45,36 +45,36 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <nav className="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
+      <nav className="bg-gray-900/80 backdrop-blur-md border-b border-pink-900/30 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
               <span className="text-2xl">🏏</span>
-              <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+              <span className="text-xl font-bold bg-gradient-to-r from-pink-400 to-rose-500 bg-clip-text text-transparent">
                 Fantasy Cricket
               </span>
             </Link>
 
             <div className="flex items-center gap-6">
-              <Link to="/" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
+              <Link to="/" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                 Matches
               </Link>
               {user && (
                 <>
-                  <Link to="/my-teams" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
+                  <Link to="/my-teams" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                     My Teams
                   </Link>
-                  <Link to="/rooms" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
+                  <Link to="/rooms" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                     Rooms
                   </Link>
-                  <Link to="/leaderboard" className="text-gray-300 hover:text-white transition-colors text-sm font-medium">
+                  <Link to="/leaderboard" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                     Leaderboard
                   </Link>
                 </>
               )}
               {user ? (
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-400">Hi, {user.username}</span>
+                  <span className="text-sm text-pink-300/70">Hi, {user.username}</span>
                   <button
                     onClick={handleLogout}
                     className="text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
@@ -85,7 +85,7 @@ function App() {
               ) : (
                 <Link
                   to="/login"
-                  className="text-sm px-4 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium"
+                  className="text-sm px-4 py-1.5 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors font-medium"
                 >
                   Login
                 </Link>

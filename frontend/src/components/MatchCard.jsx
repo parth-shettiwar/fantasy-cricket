@@ -14,7 +14,7 @@ function getCountdown(lockTime) {
 }
 
 const STATUS_STYLES = {
-  upcoming: 'bg-green-900/50 text-green-400 border-green-800',
+  upcoming: 'bg-pink-900/40 text-pink-400 border-pink-800',
   live: 'bg-red-900/50 text-red-400 border-red-800',
   completed: 'bg-gray-800/50 text-gray-400 border-gray-700',
 }
@@ -34,7 +34,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
   const isLocked = !countdown && match.status === 'upcoming'
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-gray-700 transition-all">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-pink-800/50 transition-all">
       <div className="flex items-center justify-between mb-4">
         <span className={`text-xs px-2.5 py-1 rounded-full border ${STATUS_STYLES[match.status]}`}>
           {match.status === 'live' && <span className="inline-block w-1.5 h-1.5 bg-red-500 rounded-full mr-1.5 animate-pulse"></span>}
@@ -48,7 +48,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex-1 text-center">
-          <div className="w-12 h-12 mx-auto bg-gray-800 rounded-full flex items-center justify-center text-lg font-bold text-blue-400 mb-2">
+          <div className="w-12 h-12 mx-auto bg-gray-800 rounded-full flex items-center justify-center text-lg font-bold text-pink-400 mb-2">
             {match.team1.short_name.slice(0, 2)}
           </div>
           <p className="text-sm font-semibold">{match.team1.short_name}</p>
@@ -60,7 +60,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
         </div>
 
         <div className="flex-1 text-center">
-          <div className="w-12 h-12 mx-auto bg-gray-800 rounded-full flex items-center justify-center text-lg font-bold text-orange-400 mb-2">
+          <div className="w-12 h-12 mx-auto bg-gray-800 rounded-full flex items-center justify-center text-lg font-bold text-rose-400 mb-2">
             {match.team2.short_name.slice(0, 2)}
           </div>
           <p className="text-sm font-semibold">{match.team2.short_name}</p>
@@ -72,7 +72,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
 
       {teamCount > 0 && (
         <p className="text-xs text-center mb-3">
-          <Link to={`/match/${match.id}`} className="text-cyan-400 hover:text-cyan-300 transition-colors">
+          <Link to={`/match/${match.id}`} className="text-pink-400 hover:text-pink-300 transition-colors">
             {teamCount} team{teamCount !== 1 ? 's' : ''} joined
           </Link>
         </p>
@@ -91,7 +91,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
               className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
                 hasTeam
                   ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-800 hover:bg-yellow-900/70'
-                  : 'bg-green-600 text-white hover:bg-green-500'
+                  : 'bg-pink-600 text-white hover:bg-pink-500'
               }`}
             >
               {hasTeam ? 'Edit Team' : 'Create Team'}

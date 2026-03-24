@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import api from '../api/client'
 
 const STATUS_BADGE = {
-  upcoming: 'bg-green-900/50 text-green-400 border-green-800',
+  upcoming: 'bg-pink-900/40 text-pink-400 border-pink-800',
   live: 'bg-red-900/50 text-red-400 border-red-800',
   completed: 'bg-gray-800/50 text-gray-400 border-gray-700',
 }
@@ -23,7 +23,7 @@ export default function UserProfile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -32,7 +32,6 @@ export default function UserProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -42,13 +41,12 @@ export default function UserProfile() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-green-400">{profile.total_points.toFixed(1)}</p>
+            <p className="text-3xl font-bold text-pink-400">{profile.total_points.toFixed(1)}</p>
             <p className="text-xs text-gray-500 mt-1">Total Points</p>
           </div>
         </div>
       </div>
 
-      {/* Match History */}
       <section>
         <h2 className="text-lg font-semibold text-gray-300 mb-4">Match History</h2>
 
@@ -100,7 +98,7 @@ export default function UserProfile() {
                     <span className="text-gray-600 mx-1">/</span>
                     <span className="text-cyan-400">{team.vice_captain}</span>
                   </div>
-                  <span className="text-right font-semibold text-green-400 text-sm">
+                  <span className="text-right font-semibold text-pink-400 text-sm">
                     {team.total_points.toFixed(1)}
                   </span>
                   <div className="text-right">

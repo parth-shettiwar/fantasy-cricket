@@ -40,7 +40,7 @@ export default function JoinRoom() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -74,7 +74,7 @@ export default function JoinRoom() {
           <button
             onClick={handleJoin}
             disabled={joining}
-            className="w-full px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors font-medium disabled:opacity-50"
+            className="w-full px-6 py-3 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors font-medium disabled:opacity-50"
           >
             {joining ? 'Joining...' : isLoggedIn ? 'Join Room' : 'Login & Join'}
           </button>

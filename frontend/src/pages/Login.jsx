@@ -44,7 +44,7 @@ export default function Login({ onLogin }) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-green-500 transition-colors"
+                className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-pink-500 transition-colors"
                 required
               />
             </div>
@@ -54,14 +54,14 @@ export default function Login({ onLogin }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-green-500 transition-colors"
+                className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-pink-500 transition-colors"
                 required
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-500 disabled:opacity-50 transition-colors"
+              className="w-full py-2.5 rounded-lg bg-pink-600 text-white font-medium hover:bg-pink-500 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -69,7 +69,7 @@ export default function Login({ onLogin }) {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Don't have an account?{' '}
-            <Link to="/register" className="text-green-400 hover:text-green-300">
+            <Link to="/register" className="text-pink-400 hover:text-pink-300">
               Register
             </Link>
           </p>

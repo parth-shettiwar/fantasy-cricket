@@ -2,7 +2,7 @@ const ROLE_COLORS = {
   WK: 'text-yellow-400 bg-yellow-900/30',
   BAT: 'text-blue-400 bg-blue-900/30',
   AR: 'text-purple-400 bg-purple-900/30',
-  BOWL: 'text-green-400 bg-green-900/30',
+  BOWL: 'text-emerald-400 bg-emerald-900/30',
 }
 
 export default function PlayerCard({ player, selected, disabled, teamName, onClick }) {
@@ -12,10 +12,10 @@ export default function PlayerCard({ player, selected, disabled, teamName, onCli
       disabled={disabled && !selected}
       className={`w-full p-4 rounded-xl border text-left transition-all ${
         selected
-          ? 'border-green-500 bg-green-900/20 ring-1 ring-green-500/30'
+          ? 'border-pink-500 bg-pink-900/20 ring-1 ring-pink-500/30'
           : disabled
             ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
-            : 'border-gray-800 bg-gray-900 hover:border-gray-600 cursor-pointer'
+            : 'border-gray-800 bg-gray-900 hover:border-pink-800/50 cursor-pointer'
       }`}
     >
       <div className="flex items-center justify-between">

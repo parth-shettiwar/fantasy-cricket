@@ -16,7 +16,7 @@ export default function Leaderboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -42,7 +42,7 @@ export default function Leaderboard() {
               <div
                 key={entry.user_id}
                 className={`grid grid-cols-[60px_1fr_100px_80px] gap-4 px-5 py-4 items-center border-b border-gray-800/50 ${
-                  rank <= 3 ? 'bg-gray-800/30' : ''
+                  rank <= 3 ? 'bg-pink-900/10' : ''
                 }`}
               >
                 <span className={`font-bold ${
@@ -53,8 +53,8 @@ export default function Leaderboard() {
                 }`}>
                   #{rank}
                 </span>
-                <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-green-400 transition-colors">{entry.username}</Link>
-                <span className="text-right font-semibold text-green-400">{entry.total_points.toFixed(1)}</span>
+                <Link to={`/user/${entry.user_id}`} className="font-medium hover:text-pink-400 transition-colors">{entry.username}</Link>
+                <span className="text-right font-semibold text-pink-400">{entry.total_points.toFixed(1)}</span>
                 <span className="text-right text-gray-400">{entry.teams_count}</span>
               </div>
             )

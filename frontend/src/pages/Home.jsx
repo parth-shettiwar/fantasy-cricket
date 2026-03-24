@@ -35,7 +35,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-400"></div>
       </div>
     )
   }
@@ -61,7 +61,7 @@ export default function Home() {
 
       {upcoming.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-green-400 mb-4">Upcoming Matches</h2>
+          <h2 className="text-lg font-semibold text-pink-400 mb-4">Upcoming Matches</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {upcoming.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
           </div>
