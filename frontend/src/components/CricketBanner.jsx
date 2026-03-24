@@ -1,49 +1,51 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 const ACTIONS = [
   {
     emoji: '🏏', label: 'Cover Drive!',
     imgStyle: { transform: 'rotate(-20deg) translateX(8px)', transition: 'transform 0.4s ease-out' },
+    batAngle: 60,
   },
   {
     emoji: '💥', label: 'SIX!',
     imgStyle: { transform: 'rotate(15deg) scaleX(-1) translateY(-12px)', transition: 'transform 0.3s ease-out' },
+    batAngle: -40,
   },
   {
     emoji: '☝️', label: 'Century!',
     imgStyle: { transform: 'translateY(-20px) scale(1.1)', transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    batAngle: 0,
   },
   {
     emoji: '🏃', label: 'Quick Single!',
     imgStyle: { transform: 'rotate(-8deg) skewX(-8deg) translateX(6px)', transition: 'transform 0.3s ease-out' },
+    batAngle: 20,
   },
   {
     emoji: '👊', label: 'Aggression!',
     imgStyle: { transform: 'scale(1.15) rotate(5deg)', transition: 'transform 0.2s ease-out' },
+    batAngle: -30,
   },
   {
     emoji: '🔥', label: 'On Fire!',
     imgStyle: { transform: 'translateY(-8px) rotate(-5deg) scale(1.05)', transition: 'transform 0.3s ease-out' },
+    batAngle: 45,
   },
   {
     emoji: '👑', label: 'King Kohli!',
     imgStyle: { transform: 'translateY(-16px) scale(1.12) rotate(3deg)', transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    batAngle: 10,
   },
   {
     emoji: '🎯', label: 'Pull Shot!',
     imgStyle: { transform: 'rotate(25deg) translateX(-5px) scaleX(-1)', transition: 'transform 0.3s ease-out' },
+    batAngle: -55,
   },
 ]
 
 export default function CricketBanner() {
   const [actionIdx, setActionIdx] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const videoRef = useRef(null)
-
-  useEffect(() => {
-    const el = videoRef.current
-    if (el) el.play()?.catch(() => {})
-  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -110,7 +112,7 @@ export default function CricketBanner() {
         {/* Character container - bounces on tyres */}
         <div style={{ animation: 'rideOnTyres 0.35s ease-in-out infinite' }}>
 
-          {/* Looping character video + action pose transforms */}
+          {/* Caricature + bat + action pose transforms */}
           <div
             className="relative"
             style={{
@@ -122,17 +124,29 @@ export default function CricketBanner() {
               transition: `${action.imgStyle.transition}, opacity 0.2s, filter 0.2s`,
             }}
           >
-            <video
-              ref={videoRef}
-              src="/assets/gg.mp4"
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-[76px] h-[108px] object-contain object-bottom pointer-events-none block bg-transparent"
-              width={226}
-              height={320}
-            />
+            <div
+              className="inline-block origin-bottom"
+              style={{ animation: 'headAlive 2.8s ease-in-out infinite' }}
+            >
+              <img
+                src="/assets/kohli-caricature.png"
+                alt="Player"
+                className="w-[76px] h-[108px] object-contain object-bottom"
+                width={226}
+                height={320}
+              />
+            </div>
+
+            <div
+              className="absolute right-[-8px] bottom-[15px] origin-bottom"
+              style={{
+                transform: `rotate(${action.batAngle}deg)`,
+                transition: 'transform 0.35s ease-out',
+              }}
+            >
+              <div className="w-[3px] h-[18px] bg-amber-400 rounded-t-sm" />
+              <div className="w-[8px] h-[16px] bg-amber-200 rounded-b-md -ml-[2.5px] border border-amber-400/50" />
+            </div>
 
             {/* Motion lines when transitioning */}
             {isTransitioning && (
@@ -286,6 +300,12 @@ export default function CricketBanner() {
           100% { right: 10%; top: 45%; opacity: 0; transform: rotate(-540deg); }
         }
 
+        @keyframes headAlive {
+          0%, 100% { transform: scale(1) rotate(-1deg); }
+          25% { transform: scale(1.028) rotate(1.5deg); }
+          50% { transform: scale(1.018) rotate(-0.5deg); }
+          75% { transform: scale(1.032) rotate(2deg); }
+        }
       `}</style>
     </div>
   )

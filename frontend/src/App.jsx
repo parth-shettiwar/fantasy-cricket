@@ -1,5 +1,6 @@
 import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import KingKohliVideoOverlay from './components/KingKohliVideoOverlay'
 import Home from './pages/Home'
 import TeamSelection from './pages/TeamSelection'
 import MyTeams from './pages/MyTeams'
@@ -15,6 +16,7 @@ import TeamDetail from './pages/TeamDetail'
 
 function App() {
   const [user, setUser] = useState(null)
+  const [kingKohliVideoOpen, setKingKohliVideoOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,7 +47,35 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <nav className="bg-gray-900/80 backdrop-blur-md border-b border-pink-900/30 sticky top-0 z-50">
+      <style>{`
+        @keyframes kingKohliGlow {
+          0%, 100% {
+            box-shadow: 0 0 14px #ec4899, 0 0 26px rgba(239, 68, 68, 0.55), 0 0 12px rgba(52, 211, 153, 0.45);
+            text-shadow: 0 0 8px rgba(236, 72, 153, 0.9), 0 0 4px rgba(34, 197, 94, 0.6);
+          }
+          33% {
+            box-shadow: 0 0 18px #22c55e, 0 0 22px rgba(236, 72, 153, 0.6), 0 0 14px rgba(239, 68, 68, 0.5);
+            text-shadow: 0 0 10px rgba(34, 197, 94, 0.85), 0 0 6px rgba(244, 63, 94, 0.7);
+          }
+          66% {
+            box-shadow: 0 0 16px #ef4444, 0 0 28px rgba(236, 72, 153, 0.55), 0 0 10px rgba(52, 211, 153, 0.5);
+            text-shadow: 0 0 8px rgba(248, 113, 113, 0.9), 0 0 6px rgba(236, 72, 153, 0.7);
+          }
+        }
+      `}</style>
+
+      <header className="sticky top-0 z-50">
+        <div className="flex justify-center px-4 py-2.5 bg-gray-950/95 border-b border-pink-900/40">
+          <button
+            type="button"
+            onClick={() => setKingKohliVideoOpen(true)}
+            className="rounded-full px-4 py-2 text-xs sm:text-sm font-bold tracking-wide text-white bg-gradient-to-r from-pink-950/90 via-gray-900 to-rose-950/90 border border-pink-500/40 hover:border-pink-400/70 transition-colors max-w-[min(100%,28rem)] text-center leading-snug"
+            style={{ animation: 'kingKohliGlow 2.2s ease-in-out infinite' }}
+          >
+            Watch King Kohli best contribution
+          </button>
+        </div>
+        <nav className="bg-gray-900/80 backdrop-blur-md border-b border-pink-900/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
@@ -93,7 +123,10 @@ function App() {
             </div>
           </div>
         </div>
-      </nav>
+        </nav>
+      </header>
+
+      <KingKohliVideoOverlay open={kingKohliVideoOpen} onClose={() => setKingKohliVideoOpen(false)} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
