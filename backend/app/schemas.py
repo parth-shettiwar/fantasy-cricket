@@ -33,6 +33,7 @@ class LoginRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+    frontend_origin: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):

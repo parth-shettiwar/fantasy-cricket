@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -113,6 +114,19 @@ def _smtp_configured() -> bool:
     return bool(os.environ.get("SMTP_HOST", "").strip())
 
 
+def _frontend_base_url(body: ForgotPasswordRequest) -> str:
+    """Prefer the browser origin from the client so reset links match how the app is opened (port/host)."""
+    raw = (body.frontend_origin or "").strip()
+    if raw:
+        parsed = urlparse(raw if "://" in raw else f"http://{raw}")
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    env = os.environ.get("FRONTEND_ORIGIN", "").strip().rstrip("/")
+    if env:
+        return env
+    return "http://localhost:5173"
+
+
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = (body.email or "").strip().lower()
@@ -130,7 +144,7 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     db.add(PasswordResetToken(user_id=user.id, token_hash=token_hash, expires_at=expires))
     db.commit()
 
-    frontend = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173").rstrip("/")
+    frontend = _frontend_base_url(body)
     reset_link = f"{frontend}/reset-password?token={raw_token}"
 
     if not _smtp_configured():

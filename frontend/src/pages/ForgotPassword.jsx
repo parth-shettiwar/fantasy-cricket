@@ -18,7 +18,10 @@ export default function ForgotPassword() {
     setCopied(false)
     setLoading(true)
     try {
-      const { data } = await api.post('/auth/forgot-password', { email: email.trim() })
+      const { data } = await api.post('/auth/forgot-password', {
+        email: email.trim(),
+        frontend_origin: window.location.origin,
+      })
       setMessage(data.message)
       if (data.reset_link) {
         setResetLink(data.reset_link)
