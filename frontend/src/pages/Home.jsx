@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import MatchCard from '../components/MatchCard'
+import CricketBanner from '../components/CricketBanner'
 
 export default function Home() {
   const [matches, setMatches] = useState([])
@@ -42,6 +43,8 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
+      <CricketBanner />
+
       <div>
         <h1 className="text-3xl font-bold mb-2">IPL 2026 Fantasy</h1>
         <p className="text-gray-400">Pick your dream XI and compete for the top of the leaderboard</p>
