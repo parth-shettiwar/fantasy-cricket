@@ -8,6 +8,8 @@ import MatchDetail from './pages/MatchDetail'
 import Leaderboard from './pages/Leaderboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Rooms from './pages/Rooms'
 import RoomDetail from './pages/RoomDetail'
 import JoinRoom from './pages/JoinRoom'
@@ -133,6 +135,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/register" element={<Register onLogin={handleLogin} />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/match/:matchId/select-team" element={user ? <TeamSelection /> : <Navigate to="/login" />} />
           <Route path="/match/:matchId" element={<MatchDetail />} />
           <Route path="/my-teams" element={user ? <MyTeams /> : <Navigate to="/login" />} />

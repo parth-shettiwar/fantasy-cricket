@@ -12,13 +12,19 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+const AUTH_PAGES = ['/login', '/register', '/forgot-password', '/reset-password']
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      const path = window.location.pathname
+      const onAuthPage = AUTH_PAGES.some((p) => path === p || path.startsWith(p + '/'))
+      if (!onAuthPage) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

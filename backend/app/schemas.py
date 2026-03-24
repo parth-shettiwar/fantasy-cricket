@@ -31,6 +31,24 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_link: Optional[str] = None
+
+
 # --- IPL Team ---
 
 class IPLTeamResponse(BaseModel):

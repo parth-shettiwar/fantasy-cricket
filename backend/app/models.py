@@ -80,6 +80,22 @@ class User(Base):
     password_hash = Column(String, nullable=False)
 
     teams = relationship("UserTeam", back_populates="user")
+    password_reset_tokens = relationship(
+        "PasswordResetToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+
+    user = relationship("User", back_populates="password_reset_tokens")
 
 
 class UserTeam(Base):
