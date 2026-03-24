@@ -9,10 +9,11 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 
+from bs4 import BeautifulSoup
 from app.database import get_db
 from app.models import (
     Match, MatchStatus, IPLTeam, Player, PlayerRole,
-    PlayerMatchPerformance, UserTeam, user_team_players,
+    PlayerMatchPerformance, UserTeam, UserTeamSubstitute, user_team_players,
 )
 from app.schemas import SetCricbuzzId, SetMatchStatus
 from app.services.scheduler import update_match_scores
@@ -23,6 +24,34 @@ router = APIRouter()
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "fantasy-admin-secret")
 
 CB_SERIES_URL = "https://www.cricbuzz.com/cricket-series/{series_id}/x/matches"
+IPL_SQUAD_URL = "https://www.iplt20.com/teams/{slug}/squad"
+
+TEAM_SLUGS = {
+    "MI": ("Mumbai Indians", "mumbai-indians"),
+    "CSK": ("Chennai Super Kings", "chennai-super-kings"),
+    "RCB": ("Royal Challengers Bengaluru", "royal-challengers-bengaluru"),
+    "KKR": ("Kolkata Knight Riders", "kolkata-knight-riders"),
+    "DC": ("Delhi Capitals", "delhi-capitals"),
+    "RR": ("Rajasthan Royals", "rajasthan-royals"),
+    "SRH": ("Sunrisers Hyderabad", "sunrisers-hyderabad"),
+    "PBKS": ("Punjab Kings", "punjab-kings"),
+    "LSG": ("Lucknow Super Giants", "lucknow-super-giants"),
+    "GT": ("Gujarat Titans", "gujarat-titans"),
+}
+
+ROLE_MAP = {
+    "Batter": PlayerRole.BAT,
+    "WK-Batter": PlayerRole.WK,
+    "All-Rounder": PlayerRole.AR,
+    "Bowler": PlayerRole.BOWL,
+}
+
+DEFAULT_CREDITS = {
+    PlayerRole.BAT: 8.0,
+    PlayerRole.WK: 8.0,
+    PlayerRole.AR: 8.5,
+    PlayerRole.BOWL: 8.0,
+}
 
 
 def verify_admin(x_admin_key: str = Header(...)):
@@ -151,6 +180,93 @@ async def import_series_schedule(
     }
 
 
+@router.post("/refresh-squads")
+async def refresh_squads(
+    db: Session = Depends(get_db),
+    _=Depends(verify_admin),
+):
+    """Scrape latest IPL squads from iplt20.com and update the database.
+
+    For each team: creates the team if missing, then adds any new players
+    and removes players no longer in the squad. Existing player IDs are
+    preserved so team selections remain valid.
+    """
+    ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+    summary: list[dict] = []
+
+    async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        for short, (full_name, slug) in TEAM_SLUGS.items():
+            url = IPL_SQUAD_URL.format(slug=slug)
+            try:
+                resp = await client.get(url, headers={"User-Agent": ua})
+                resp.raise_for_status()
+            except Exception as exc:
+                summary.append({"team": short, "error": str(exc)})
+                continue
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            scraped: list[dict] = []
+            for a_tag in soup.find_all("a", attrs={"data-player_name": True}):
+                pname = a_tag["data-player_name"]
+                role_span = a_tag.find("span", class_="d-block")
+                role_text = role_span.get_text(strip=True) if role_span else "Batter"
+                role = ROLE_MAP.get(role_text, PlayerRole.BAT)
+                scraped.append({"name": pname, "role": role})
+
+            if not scraped:
+                summary.append({"team": short, "error": "No players found on page"})
+                continue
+
+            team = _get_or_create_team(db, full_name, short)
+
+            existing = db.query(Player).filter(Player.team_id == team.id).all()
+            existing_by_name = {p.name.lower(): p for p in existing}
+
+            added, updated, unchanged = 0, 0, 0
+            scraped_names_lower: set[str] = set()
+
+            for sp in scraped:
+                key = sp["name"].lower()
+                scraped_names_lower.add(key)
+
+                if key in existing_by_name:
+                    player = existing_by_name[key]
+                    if player.role != sp["role"]:
+                        player.role = sp["role"]
+                        updated += 1
+                    else:
+                        unchanged += 1
+                else:
+                    p = Player(
+                        name=sp["name"],
+                        team_id=team.id,
+                        role=sp["role"],
+                        credits=DEFAULT_CREDITS.get(sp["role"], 8.0),
+                    )
+                    db.add(p)
+                    added += 1
+
+            removed_names = [
+                p.name for p in existing
+                if p.name.lower() not in scraped_names_lower
+            ]
+
+            summary.append({
+                "team": short,
+                "total_scraped": len(scraped),
+                "added": added,
+                "updated": updated,
+                "unchanged": unchanged,
+                "no_longer_in_squad": removed_names,
+            })
+
+    db.commit()
+    return {"teams_processed": len(summary), "details": summary}
+
+
 @router.delete("/clear-matches")
 async def clear_all_matches(
     db: Session = Depends(get_db),
@@ -171,6 +287,7 @@ async def clear_everything(
     _=Depends(verify_admin),
 ):
     """Nuclear option: delete ALL data (matches, players, teams). Fresh start."""
+    db.query(UserTeamSubstitute).delete()
     db.execute(user_team_players.delete())
     db.query(PlayerMatchPerformance).delete()
     db.query(UserTeam).delete()
