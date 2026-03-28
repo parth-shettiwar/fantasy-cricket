@@ -234,7 +234,7 @@ def room_leaderboard(
         .outerjoin(UserTeam, User.id == UserTeam.user_id)
         .filter(User.id.in_(member_ids))
         .group_by(User.id)
-        .order_by(func.sum(UserTeam.total_points).desc())
+        .order_by(func.coalesce(func.sum(UserTeam.total_points), 0).desc())
         .all()
     )
 

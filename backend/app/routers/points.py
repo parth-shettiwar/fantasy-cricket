@@ -137,7 +137,7 @@ def leaderboard(db: Session = Depends(get_db)):
         )
         .outerjoin(UserTeam, User.id == UserTeam.user_id)
         .group_by(User.id)
-        .order_by(func.sum(UserTeam.total_points).desc())
+        .order_by(func.coalesce(func.sum(UserTeam.total_points), 0).desc())
         .all()
     )
 
