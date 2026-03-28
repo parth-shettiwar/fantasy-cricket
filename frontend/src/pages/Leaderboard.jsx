@@ -7,10 +7,30 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/points/leaderboard')
-      .then(res => setEntries(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    let mounted = true
+
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await api.get('/points/leaderboard')
+        if (mounted) {
+          setEntries(res.data)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchLeaderboard()
+    const intervalId = setInterval(fetchLeaderboard, 30000)
+
+    return () => {
+      mounted = false
+      clearInterval(intervalId)
+    }
   }, [])
 
   if (loading) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api/client'
 
@@ -17,23 +17,52 @@ export default function MatchDetail() {
   const [matchTeams, setMatchTeams] = useState([])
   const [expandedTeam, setExpandedTeam] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const mountedRef = useRef(true)
 
-  useEffect(() => {
-    Promise.all([
-      api.get(`/matches/${matchId}`),
-      api.get(`/points/match/${matchId}/performances`),
-      api.get(`/matches/${matchId}/players`),
-      api.get(`/points/match/${matchId}/leaderboard`),
-    ]).then(([matchRes, perfRes, playersRes, teamsRes]) => {
+  const fetchMatchData = useCallback(async (isManual = false) => {
+    if (isManual && mountedRef.current) {
+      setRefreshing(true)
+    }
+
+    try {
+      const [matchRes, perfRes, playersRes, teamsRes] = await Promise.all([
+        api.get(`/matches/${matchId}`),
+        api.get(`/points/match/${matchId}/performances`),
+        api.get(`/matches/${matchId}/players`),
+        api.get(`/points/match/${matchId}/leaderboard`),
+      ])
+
+      if (!mountedRef.current) return
+
       setMatch(matchRes.data)
       setPerformances(perfRes.data)
       const pmap = {}
       playersRes.data.forEach(p => { pmap[p.id] = p })
       setPlayers(pmap)
       setMatchTeams(teamsRes.data)
-    }).catch(console.error)
-      .finally(() => setLoading(false))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+        if (isManual) {
+          setRefreshing(false)
+        }
+      }
+    }
   }, [matchId])
+
+  useEffect(() => {
+    mountedRef.current = true
+    fetchMatchData()
+    const intervalId = setInterval(fetchMatchData, 10000)
+
+    return () => {
+      mountedRef.current = false
+      clearInterval(intervalId)
+    }
+  }, [fetchMatchData])
 
   if (loading) {
     return (
@@ -108,6 +137,13 @@ export default function MatchDetail() {
               Create Team
             </Link>
           )}
+          <button
+            onClick={() => fetchMatchData(true)}
+            disabled={refreshing}
+            className="text-sm px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
           <span className={`text-xs px-2.5 py-1 rounded-full border ${
             match.status === 'completed' ? 'bg-gray-800/50 text-gray-400 border-gray-700' :
             match.status === 'live' ? 'bg-red-900/50 text-red-400 border-red-800 animate-pulse' :

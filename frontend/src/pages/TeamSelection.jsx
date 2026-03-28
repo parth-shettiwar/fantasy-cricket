@@ -16,6 +16,20 @@ const MAX_SUBS = 4
 const STEP_SUBS = ROLE_STEPS.length
 const STEP_CAPTAIN = ROLE_STEPS.length + 1
 
+function formatLocalDeadline(lockTime) {
+  const dt = new Date(lockTime)
+  if (Number.isNaN(dt.getTime())) return ''
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const local = dt.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${local} (${tz})`
+}
+
 export default function TeamSelection() {
   const { matchId } = useParams()
   const navigate = useNavigate()
@@ -186,12 +200,17 @@ export default function TeamSelection() {
 
   if (!match) return <p className="text-red-400">Match not found</p>
 
+  const localDeadline = formatLocalDeadline(match.lock_time)
+
   if (match.status !== 'upcoming') {
     return (
       <div className="text-center py-20 space-y-4">
         <div className="text-5xl">🔒</div>
         <h2 className="text-xl font-bold text-gray-300">Team Locked</h2>
         <p className="text-gray-500">You cannot create or edit teams after the match has started.</p>
+        {localDeadline && (
+          <p className="text-sm text-gray-500">Submission deadline was: {localDeadline}</p>
+        )}
         <button onClick={() => navigate(-1)} className="inline-block mt-4 text-sm text-pink-400 hover:text-pink-300 transition-colors">
           &larr; Go back
         </button>
@@ -212,6 +231,11 @@ export default function TeamSelection() {
             {match.venue}
             {isEditing && <span className="ml-2 text-yellow-400 font-medium">· Editing Team</span>}
           </p>
+          {localDeadline && (
+            <p className="text-xs text-gray-500 mt-1">
+              Last time to submit (your local time): {localDeadline}
+            </p>
+          )}
         </div>
         <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-white transition-colors">
           &larr; Back

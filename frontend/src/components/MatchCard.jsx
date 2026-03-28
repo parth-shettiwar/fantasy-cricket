@@ -13,6 +13,20 @@ function getCountdown(lockTime) {
   return `${m}m ${s}s`
 }
 
+function formatLocalDeadline(lockTime) {
+  const dt = new Date(lockTime)
+  if (Number.isNaN(dt.getTime())) return ''
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const local = dt.toLocaleString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${local} (${tz})`
+}
+
 const STATUS_STYLES = {
   upcoming: 'bg-pink-900/40 text-pink-400 border-pink-800',
   live: 'bg-red-900/50 text-red-400 border-red-800',
@@ -31,6 +45,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
   }, [match.lock_time, match.status])
 
   const matchDate = new Date(match.date)
+  const localDeadline = formatLocalDeadline(match.lock_time)
   const isLocked = !countdown && match.status === 'upcoming'
 
   return (
@@ -79,23 +94,30 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
       )}
 
       {match.status === 'upcoming' && (
-        <div className="flex items-center justify-between">
-          {countdown ? (
-            <span className="text-xs text-amber-400">Locks in {countdown}</span>
-          ) : (
-            <span className="text-xs text-red-400">Locked</span>
-          )}
-          {!isLocked && (
-            <Link
-              to={`/match/${match.id}/select-team`}
-              className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
-                hasTeam
-                  ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-800 hover:bg-yellow-900/70'
-                  : 'bg-pink-600 text-white hover:bg-pink-500'
-              }`}
-            >
-              {hasTeam ? 'Edit Team' : 'Create Team'}
-            </Link>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            {countdown ? (
+              <span className="text-xs text-amber-400">Locks in {countdown}</span>
+            ) : (
+              <span className="text-xs text-red-400">Locked</span>
+            )}
+            {!isLocked && (
+              <Link
+                to={`/match/${match.id}/select-team`}
+                className={`text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+                  hasTeam
+                    ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-800 hover:bg-yellow-900/70'
+                    : 'bg-pink-600 text-white hover:bg-pink-500'
+                }`}
+              >
+                {hasTeam ? 'Edit Team' : 'Create Team'}
+              </Link>
+            )}
+          </div>
+          {localDeadline && (
+            <p className="text-[11px] text-gray-500">
+              Submit by: {localDeadline}
+            </p>
           )}
         </div>
       )}

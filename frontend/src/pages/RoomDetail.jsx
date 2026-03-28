@@ -11,16 +11,34 @@ export default function RoomDetail() {
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.get(`/rooms/${roomId}`),
-      api.get(`/rooms/${roomId}/leaderboard`),
-    ])
-      .then(([roomRes, lbRes]) => {
-        setRoom(roomRes.data)
-        setLeaderboard(lbRes.data)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    let mounted = true
+
+    const fetchRoomData = async () => {
+      try {
+        const [roomRes, lbRes] = await Promise.all([
+          api.get(`/rooms/${roomId}`),
+          api.get(`/rooms/${roomId}/leaderboard`),
+        ])
+        if (mounted) {
+          setRoom(roomRes.data)
+          setLeaderboard(lbRes.data)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchRoomData()
+    const intervalId = setInterval(fetchRoomData, 30000)
+
+    return () => {
+      mounted = false
+      clearInterval(intervalId)
+    }
   }, [roomId])
 
   const shareLink = room ? `${window.location.origin}/join/${room.invite_code}` : ''

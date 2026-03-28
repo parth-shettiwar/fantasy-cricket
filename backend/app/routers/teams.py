@@ -58,7 +58,10 @@ def _validate_inputs(team_in: UserTeamCreate, match: Match, db: Session):
         raise HTTPException(status_code=400, detail="Cannot modify team after match has started")
 
     if datetime.utcnow() > match.lock_time:
-        raise HTTPException(status_code=400, detail="Team selection is locked for this match")
+        raise HTTPException(
+            status_code=400,
+            detail="Team selection is locked 30 minutes before match start",
+        )
 
     if team_in.captain_id not in team_in.player_ids:
         raise HTTPException(status_code=400, detail="Captain must be in selected players")
