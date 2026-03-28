@@ -101,7 +101,7 @@ async def update_match_scores(match: Match, db: Session):
             "run_outs": entry.run_outs,
         }
 
-    # --- Lock playing XI on first detection (toss time) ---
+    # --- Lock / expand playing XI as innings data arrives ---
     locked_ids = _get_locked_ids(match)
     if locked_ids is None and scraped_playing_ids:
         match.locked_playing_ids = json.dumps(sorted(scraped_playing_ids))
@@ -109,6 +109,14 @@ async def update_match_scores(match: Match, db: Session):
         logger.info(
             "Match %d: locked playing XI (%d players) at first detection",
             match.id, len(locked_ids),
+        )
+    elif locked_ids is not None and scraped_playing_ids - locked_ids:
+        new_players = scraped_playing_ids - locked_ids
+        locked_ids = locked_ids | scraped_playing_ids
+        match.locked_playing_ids = json.dumps(sorted(locked_ids))
+        logger.info(
+            "Match %d: expanded playing XI by %d players (now %d total)",
+            match.id, len(new_players), len(locked_ids),
         )
 
     for player in players:
