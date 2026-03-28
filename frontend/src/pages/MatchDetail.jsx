@@ -125,7 +125,7 @@ export default function MatchDetail() {
           </h1>
           <p className="text-sm text-gray-400 mt-1">
             {match.venue} &middot;{' '}
-            {new Date(match.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(match.date.endsWith?.('Z') || match.date.includes?.('+') ? match.date : match.date + 'Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-3">

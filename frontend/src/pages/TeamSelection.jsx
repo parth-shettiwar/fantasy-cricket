@@ -16,9 +16,15 @@ const MAX_SUBS = 4
 const STEP_SUBS = ROLE_STEPS.length
 const STEP_CAPTAIN = ROLE_STEPS.length + 1
 
+function asUTC(dateStr) {
+  if (!dateStr) return null
+  const s = String(dateStr)
+  return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z')
+}
+
 function formatLocalDeadline(lockTime) {
-  const dt = new Date(lockTime)
-  if (Number.isNaN(dt.getTime())) return ''
+  const dt = asUTC(lockTime)
+  if (!dt || Number.isNaN(dt.getTime())) return ''
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const local = dt.toLocaleString('en-US', {
     weekday: 'short',

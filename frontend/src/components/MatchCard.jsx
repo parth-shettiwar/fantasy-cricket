@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 
+function asUTC(dateStr) {
+  if (!dateStr) return null
+  const s = String(dateStr)
+  return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z')
+}
+
 function getCountdown(lockTime) {
-  const diff = new Date(lockTime) - new Date()
+  const diff = asUTC(lockTime) - new Date()
   if (diff <= 0) return null
   const d = Math.floor(diff / 86400000)
   const h = Math.floor((diff % 86400000) / 3600000)
@@ -14,8 +20,8 @@ function getCountdown(lockTime) {
 }
 
 function formatLocalDeadline(lockTime) {
-  const dt = new Date(lockTime)
-  if (Number.isNaN(dt.getTime())) return ''
+  const dt = asUTC(lockTime)
+  if (!dt || Number.isNaN(dt.getTime())) return ''
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const local = dt.toLocaleString('en-US', {
     weekday: 'short',
@@ -44,7 +50,7 @@ export default function MatchCard({ match, teamCount = 0, hasTeam = false }) {
     return () => clearInterval(interval)
   }, [match.lock_time, match.status])
 
-  const matchDate = new Date(match.date)
+  const matchDate = asUTC(match.date)
   const localDeadline = formatLocalDeadline(match.lock_time)
   const isLocked = !countdown && match.status === 'upcoming'
 
