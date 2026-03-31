@@ -119,6 +119,14 @@ export default function Leaderboard() {
                   </p>
                 ) : (
                   <>
+                    <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
+                      <Link
+                        to={`/compare?match_id=${match.id}`}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 transition-colors"
+                      >
+                        Compare two users
+                      </Link>
+                    </div>
                     <div className="grid grid-cols-[50px_1fr_100px] gap-4 px-5 py-2 text-xs text-gray-500 font-medium border-t border-gray-800">
                       <span>Rank</span>
                       <span>Player</span>

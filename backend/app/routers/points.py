@@ -423,3 +423,130 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
         "not_playing": [{"player_id": p.id, "name": p.name, "role": p.role.value} for p in not_playing_main],
         "bench_substitutes": benched_subs,
     }
+
+
+@router.get("/compare")
+def compare_users_for_match(
+    match_id: int,
+    user1_id: int,
+    user2_id: int,
+    db: Session = Depends(get_db),
+):
+    """Compare two users' teams for a specific match."""
+    if user1_id == user2_id:
+        raise HTTPException(status_code=400, detail="Please select two different users")
+
+    match = (
+        db.query(Match)
+        .options(joinedload(Match.team1), joinedload(Match.team2))
+        .filter(Match.id == match_id)
+        .first()
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.status == MatchStatus.UPCOMING:
+        raise HTTPException(status_code=400, detail="Comparison is available once the match starts")
+
+    teams = (
+        db.query(UserTeam)
+        .options(
+            joinedload(UserTeam.players).joinedload(Player.team),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player).joinedload(Player.team),
+            joinedload(UserTeam.match),
+            joinedload(UserTeam.captain),
+            joinedload(UserTeam.vice_captain),
+        )
+        .filter(UserTeam.match_id == match_id, UserTeam.user_id.in_([user1_id, user2_id]))
+        .all()
+    )
+    team_by_user = {t.user_id: t for t in teams}
+    if user1_id not in team_by_user or user2_id not in team_by_user:
+        raise HTTPException(status_code=404, detail="One or both users have not submitted a team for this match")
+
+    users = db.query(User).filter(User.id.in_([user1_id, user2_id])).all()
+    users_by_id = {u.id: u for u in users}
+
+    def _team_payload(ut: UserTeam):
+        effective = _build_effective_xi(ut, ut.match_id, db, match=ut.match)
+        players = []
+        total = 0.0
+        for player in effective:
+            perf = (
+                db.query(PlayerMatchPerformance)
+                .filter(
+                    PlayerMatchPerformance.player_id == player.id,
+                    PlayerMatchPerformance.match_id == ut.match_id,
+                )
+                .first()
+            )
+            is_cap = player.id == ut.captain_id
+            is_vc = player.id == ut.vice_captain_id
+
+            if perf:
+                pts = calculate_player_points(perf, player.role)
+                final = calculate_final_points(pts["total_points"], is_cap, is_vc)
+                base = pts["total_points"]
+            else:
+                final = 0.0
+                base = 0.0
+
+            total += final
+            players.append({
+                "player_id": player.id,
+                "name": player.name,
+                "team_short": player.team.short_name if player.team else "",
+                "role": player.role.value,
+                "is_captain": is_cap,
+                "is_vice_captain": is_vc,
+                "base_points": base,
+                "final_points": final,
+            })
+
+        return {
+            "user_team_id": ut.id,
+            "user_id": ut.user_id,
+            "username": users_by_id[ut.user_id].username if ut.user_id in users_by_id else "?",
+            "total_points": total,
+            "players": sorted(players, key=lambda p: -p["final_points"]),
+        }
+
+    t1 = _team_payload(team_by_user[user1_id])
+    t2 = _team_payload(team_by_user[user2_id])
+
+    p1_ids = {p["player_id"] for p in t1["players"]}
+    p2_ids = {p["player_id"] for p in t2["players"]}
+    common_ids = p1_ids & p2_ids
+
+    p1_map = {p["player_id"]: p for p in t1["players"]}
+    p2_map = {p["player_id"]: p for p in t2["players"]}
+
+    shared = []
+    for pid in common_ids:
+        p1 = p1_map[pid]
+        p2 = p2_map[pid]
+        shared.append({
+            "player_id": pid,
+            "name": p1["name"],
+            "team_short": p1["team_short"],
+            "user1_final_points": p1["final_points"],
+            "user2_final_points": p2["final_points"],
+            "user1_multiplier": "2x" if p1["is_captain"] else "1.5x" if p1["is_vice_captain"] else "1x",
+            "user2_multiplier": "2x" if p2["is_captain"] else "1.5x" if p2["is_vice_captain"] else "1x",
+        })
+
+    only_user1 = sorted([p1_map[pid] for pid in (p1_ids - p2_ids)], key=lambda p: -p["final_points"])
+    only_user2 = sorted([p2_map[pid] for pid in (p2_ids - p1_ids)], key=lambda p: -p["final_points"])
+
+    return {
+        "match": {
+            "id": match.id,
+            "name": f"{match.team1.short_name} vs {match.team2.short_name}",
+            "status": match.status.value,
+        },
+        "user1": t1,
+        "user2": t2,
+        "delta": t1["total_points"] - t2["total_points"],
+        "shared_players": sorted(shared, key=lambda p: p["name"]),
+        "only_user1": only_user1,
+        "only_user2": only_user2,
+    }

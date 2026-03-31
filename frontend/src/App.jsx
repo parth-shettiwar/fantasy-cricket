@@ -15,6 +15,7 @@ import RoomDetail from './pages/RoomDetail'
 import JoinRoom from './pages/JoinRoom'
 import UserProfile from './pages/UserProfile'
 import TeamDetail from './pages/TeamDetail'
+import TeamCompare from './pages/TeamCompare'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -102,6 +103,9 @@ function App() {
                   <Link to="/leaderboard" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                     Leaderboard
                   </Link>
+                  <Link to="/compare" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
+                    Compare
+                  </Link>
                 </>
               )}
               {user ? (
@@ -146,6 +150,7 @@ function App() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/team/:teamId" element={<TeamDetail />} />
+          <Route path="/compare" element={<TeamCompare />} />
         </Routes>
       </main>
     </div>
