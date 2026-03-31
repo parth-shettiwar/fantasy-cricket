@@ -18,9 +18,13 @@ export default function TeamCompare() {
       .then(res => {
         const playable = res.data.filter(m => m.status === 'live' || m.status === 'completed')
         setMatches(playable)
+        // If opened from nav without query params, default to latest playable match.
+        if (!matchId && playable.length > 0) {
+          setSearchParams({ match_id: String(playable[0].id) })
+        }
       })
       .catch(console.error)
-  }, [])
+  }, [matchId, setSearchParams])
 
   useEffect(() => {
     if (!matchId) {
@@ -83,9 +87,13 @@ export default function TeamCompare() {
           <select
             value={matchId}
             onChange={e => {
-              updateParam('match_id', e.target.value)
-              updateParam('user1_id', '')
-              updateParam('user2_id', '')
+              const nextMatchId = e.target.value
+              const next = new URLSearchParams(searchParams)
+              if (nextMatchId) next.set('match_id', nextMatchId)
+              else next.delete('match_id')
+              next.delete('user1_id')
+              next.delete('user2_id')
+              setSearchParams(next)
             }}
             className="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm"
           >
