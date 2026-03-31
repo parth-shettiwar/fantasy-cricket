@@ -25,7 +25,11 @@ def get_points_breakdown(
 ):
     user_team = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players).joinedload(Player.team),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player).joinedload(Player.team),
+            joinedload(UserTeam.match),
+        )
         .filter(UserTeam.id == user_team_id, UserTeam.user_id == current_user.id)
         .first()
     )
@@ -35,7 +39,9 @@ def get_points_breakdown(
     player_points_list = []
     total = 0.0
 
-    for player in user_team.players:
+    effective_players = _build_effective_xi(user_team, user_team.match_id, db, match=user_team.match)
+
+    for player in effective_players:
         perf = (
             db.query(PlayerMatchPerformance)
             .filter(
@@ -98,7 +104,11 @@ def calculate_and_store_points(
     """Recalculate and persist total points for a user team."""
     user_team = (
         db.query(UserTeam)
-        .options(joinedload(UserTeam.players))
+        .options(
+            joinedload(UserTeam.players),
+            joinedload(UserTeam.substitutes).joinedload(UserTeamSubstitute.player),
+            joinedload(UserTeam.match),
+        )
         .filter(UserTeam.id == user_team_id, UserTeam.user_id == current_user.id)
         .first()
     )
@@ -106,7 +116,9 @@ def calculate_and_store_points(
         raise HTTPException(status_code=404, detail="Team not found")
 
     total = 0.0
-    for player in user_team.players:
+    effective_players = _build_effective_xi(user_team, user_team.match_id, db, match=user_team.match)
+
+    for player in effective_players:
         perf = (
             db.query(PlayerMatchPerformance)
             .filter(
