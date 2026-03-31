@@ -394,6 +394,8 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
                 "priority": s.priority,
             })
 
+    live_total = sum(p["points"]["final"] for p in player_details)
+
     return {
         "user_team_id": ut.id,
         "user_id": ut.user_id,
@@ -402,7 +404,7 @@ def public_team_detail(user_team_id: int, db: Session = Depends(get_db)):
         "match_name": f"{ut.match.team1.short_name} vs {ut.match.team2.short_name}" if ut.match else "?",
         "match_date": ut.match.date.isoformat() if ut.match else "",
         "match_status": ut.match.status.value if ut.match else "",
-        "total_points": ut.total_points,
+        "total_points": live_total,
         "captain": ut.captain.name if ut.captain else "?",
         "vice_captain": ut.vice_captain.name if ut.vice_captain else "?",
         "players": sorted(player_details, key=lambda p: -p["points"]["final"]),

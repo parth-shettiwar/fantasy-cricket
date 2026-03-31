@@ -53,7 +53,7 @@ export default function TeamDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 sm:p-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <Link to={`/user/${team.user_id}`} className="text-lg font-bold hover:text-pink-400 transition-colors">
@@ -81,7 +81,8 @@ export default function TeamDetail() {
       <section>
         <h2 className="text-lg font-semibold text-gray-300 mb-4">Playing XI</h2>
         <div className="space-y-2">
-          <div className="hidden sm:grid grid-cols-[1fr_60px_60px_60px_60px_60px_70px] gap-2 px-4 py-2 text-xs text-gray-500 font-medium">
+          {/* Desktop header */}
+          <div className="hidden md:grid grid-cols-[1fr_60px_60px_60px_60px_60px_70px] gap-2 px-4 py-2 text-xs text-gray-500 font-medium">
             <span>Player</span>
             <span className="text-right">Bat</span>
             <span className="text-right">Bowl</span>
@@ -96,26 +97,26 @@ export default function TeamDetail() {
               key={p.player_id}
               className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden"
             >
-              <div className="grid grid-cols-[1fr_60px_60px_60px_60px_60px_70px] gap-2 px-4 py-3 items-center">
+              {/* Desktop layout */}
+              <div className="hidden md:grid grid-cols-[1fr_60px_60px_60px_60px_60px_70px] gap-2 px-4 py-3 items-center">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${ROLE_COLORS[p.role] || ''}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 ${ROLE_COLORS[p.role] || ''}`}>
                     {p.role}
                   </span>
                   <span className="truncate text-sm font-medium">{p.name}</span>
-                  <span className="text-[10px] text-gray-600">{p.team_short}</span>
+                  <span className="text-[10px] text-gray-600 shrink-0">{p.team_short}</span>
                   {p.is_captain && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/50 text-orange-400 border border-orange-800 font-bold">C</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/50 text-orange-400 border border-orange-800 font-bold shrink-0">C</span>
                   )}
                   {p.is_vice_captain && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 font-bold">VC</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 font-bold shrink-0">VC</span>
                   )}
                   {p.is_substitute && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-400 border border-amber-800 font-medium">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-400 border border-amber-800 font-medium shrink-0">
                       SUB {p.replaces ? `for ${p.replaces}` : 'IN'}
                     </span>
                   )}
                 </div>
-
                 <span className="text-right text-sm text-blue-300">{p.points.batting || '-'}</span>
                 <span className="text-right text-sm text-emerald-300">{p.points.bowling || '-'}</span>
                 <span className="text-right text-sm text-yellow-300">{p.points.fielding || '-'}</span>
@@ -131,8 +132,42 @@ export default function TeamDetail() {
                 </span>
               </div>
 
+              {/* Mobile layout */}
+              <div className="md:hidden px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className={`text-[10px] px-1 py-0.5 rounded border font-medium shrink-0 ${ROLE_COLORS[p.role] || ''}`}>
+                      {p.role}
+                    </span>
+                    <span className="text-sm font-medium truncate">{p.name}</span>
+                    {p.is_captain && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-orange-900/50 text-orange-400 border border-orange-800 font-bold shrink-0">C</span>
+                    )}
+                    {p.is_vice_captain && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 font-bold shrink-0">VC</span>
+                    )}
+                  </div>
+                  <span className={`text-sm font-bold shrink-0 ${p.points.final > 0 ? 'text-pink-400' : p.points.final < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                    {p.points.final ? p.points.final.toFixed(1) : '-'}
+                    {(p.is_captain || p.is_vice_captain) && p.points.total > 0 && (
+                      <span className="text-[9px] text-gray-500 ml-0.5">
+                        ({p.is_captain ? '2x' : '1.5x'})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                  <span className="text-gray-600">{p.team_short}</span>
+                  {p.points.batting > 0 && <span className="text-blue-400/70">B:{p.points.batting}</span>}
+                  {p.points.bowling > 0 && <span className="text-emerald-400/70">W:{p.points.bowling}</span>}
+                  {p.points.fielding > 0 && <span className="text-yellow-400/70">F:{p.points.fielding}</span>}
+                  {p.points.bonus > 0 && <span className="text-purple-400/70">+{p.points.bonus}</span>}
+                  {p.is_substitute && <span className="text-amber-400">SUB {p.replaces ? `for ${p.replaces}` : 'IN'}</span>}
+                </div>
+              </div>
+
               {p.stats && (
-                <div className="px-4 py-2 bg-gray-800/30 border-t border-gray-800/50 flex gap-4 text-xs text-gray-500">
+                <div className="px-3 sm:px-4 py-2 bg-gray-800/30 border-t border-gray-800/50 flex gap-3 sm:gap-4 text-[11px] sm:text-xs text-gray-500 flex-wrap">
                   {p.stats.runs > 0 && <span>{p.stats.runs} runs ({p.stats.balls}b, {p.stats.fours}x4, {p.stats.sixes}x6)</span>}
                   {p.stats.wickets > 0 && <span>{p.stats.wickets}w ({p.stats.overs} ov)</span>}
                   {p.stats.catches > 0 && <span>{p.stats.catches} catch{p.stats.catches > 1 ? 'es' : ''}</span>}
