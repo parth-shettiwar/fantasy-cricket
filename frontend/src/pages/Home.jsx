@@ -29,9 +29,17 @@ export default function Home() {
       .finally(() => setLoading(false))
   }, [])
 
-  const upcoming = matches.filter(m => m.status === 'upcoming')
-  const completed = matches.filter(m => m.status === 'completed')
+  const now = new Date()
   const live = matches.filter(m => m.status === 'live')
+  const completed = matches.filter(m => {
+    if (m.status === 'completed') return true
+    if (m.status !== 'upcoming') return false
+    const matchDate = new Date(String(m.date).endsWith('Z') || String(m.date).includes('+') ? m.date : `${m.date}Z`)
+    return matchDate < now
+  })
+  const completedIds = new Set(completed.map(m => m.id))
+  const liveIds = new Set(live.map(m => m.id))
+  const upcoming = matches.filter(m => !liveIds.has(m.id) && !completedIds.has(m.id))
 
   if (loading) {
     return (
