@@ -462,6 +462,31 @@ async def submit_ai_teams():
             if not (match.lock_time > now and seconds_to_match <= 3 * 3600):
                 continue
 
+            existing_teams = (
+                db.query(UserTeam)
+                .filter(UserTeam.user_id == ai_user.id, UserTeam.match_id == match.id)
+                .order_by(UserTeam.id.desc())
+                .all()
+            )
+
+            # Defensive cleanup: if duplicates exist, keep latest and remove extras.
+            if len(existing_teams) > 1:
+                keep_id = existing_teams[0].id
+                for dup in existing_teams[1:]:
+                    db.execute(
+                        user_team_players.delete().where(user_team_players.c.user_team_id == dup.id)
+                    )
+                    db.query(UserTeamSubstitute).filter(
+                        UserTeamSubstitute.user_team_id == dup.id
+                    ).delete()
+                    db.query(UserTeam).filter(UserTeam.id == dup.id).delete()
+                db.commit()
+                logger.warning(
+                    "Cleaned duplicate AI teams for match %d, kept team %d",
+                    match.id,
+                    keep_id,
+                )
+
             existing = (
                 db.query(UserTeam)
                 .filter(UserTeam.user_id == ai_user.id, UserTeam.match_id == match.id)

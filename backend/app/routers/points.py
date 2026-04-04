@@ -196,14 +196,19 @@ def match_leaderboard(match_id: int, db: Session = Depends(get_db)):
         .options(joinedload(UserTeam.players), joinedload(UserTeam.captain), joinedload(UserTeam.vice_captain))
         .join(User, User.id == UserTeam.user_id)
         .filter(UserTeam.match_id == match_id)
-        .order_by(UserTeam.total_points.desc())
+        .order_by(UserTeam.total_points.desc(), UserTeam.id.desc())
         .all()
     )
 
     locked = match.status != MatchStatus.UPCOMING
 
+    # Defensive dedupe: show at most one team per user for this match.
+    seen_users = set()
     result = []
     for ut in teams:
+        if ut.user_id in seen_users:
+            continue
+        seen_users.add(ut.user_id)
         user = db.query(User).filter(User.id == ut.user_id).first()
         entry = {
             "user_team_id": ut.id,
