@@ -8,18 +8,20 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 
 from bs4 import BeautifulSoup
 from app.database import get_db
 from app.models import (
     Match, MatchStatus, IPLTeam, Player, PlayerRole,
-    PlayerMatchPerformance, UserTeam, UserTeamSubstitute, user_team_players, MatchCondition,
+    PlayerMatchPerformance, UserTeam, UserTeamSubstitute, user_team_players, MatchCondition, User,
 )
-from app.schemas import SetCricbuzzId, SetMatchStatus, SetMatchConditions
+from app.schemas import SetCricbuzzId, SetMatchStatus, SetMatchConditions, AdminResetPasswordRequest
 from app.services.scheduler import update_match_scores
 from app.services.cricket_scraper import HEADERS
 
 router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 ADMIN_KEY = os.environ.get("ADMIN_KEY", "fantasy-admin-secret")
 
@@ -397,3 +399,25 @@ async def list_all_matches(
         }
         for m in matches
     ]
+
+
+@router.post("/user/reset-password")
+async def admin_reset_user_password(
+    body: AdminResetPasswordRequest,
+    db: Session = Depends(get_db),
+    _=Depends(verify_admin),
+):
+    """Admin-only direct password reset by username."""
+    username = (body.username or "").strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="username is required")
+    if len(body.new_password or "") < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = pwd_context.hash(body.new_password)
+    db.commit()
+    return {"status": "ok", "username": user.username}

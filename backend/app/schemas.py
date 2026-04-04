@@ -234,3 +234,8 @@ class AIFeedbackRequest(BaseModel):
     recommendation_type: str
     accepted: bool
     payload_json: str = ""
+
+
+class AdminResetPasswordRequest(BaseModel):
+    username: str
+    new_password: str
