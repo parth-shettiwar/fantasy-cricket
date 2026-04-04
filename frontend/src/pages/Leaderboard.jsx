@@ -11,6 +11,7 @@ function asUTC(dateStr) {
 export default function Leaderboard() {
   const [matches, setMatches] = useState([])
   const [leaderboards, setLeaderboards] = useState({})
+  const [podium, setPodium] = useState([])
   const [expandedMatch, setExpandedMatch] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -37,6 +38,10 @@ export default function Leaderboard() {
         const lbMap = {}
         results.forEach(([mid, data]) => { lbMap[mid] = data })
         setLeaderboards(lbMap)
+
+        const podiumRes = await api.get('/points/podium').catch(() => ({ data: [] }))
+        if (!mounted) return
+        setPodium(podiumRes.data || [])
 
         if (completed.length > 0 && !expandedMatch) {
           setExpandedMatch(completed[0].id)
@@ -77,6 +82,41 @@ export default function Leaderboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Leaderboard</h1>
+
+      <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-300">Podium Medal Table (Olympic Ranking)</h2>
+          <span className="text-[11px] text-gray-500">Completed matches only</span>
+        </div>
+        {podium.length === 0 ? (
+          <p className="text-gray-500 text-sm px-5 py-4">No podium finishes yet.</p>
+        ) : (
+          <div>
+            <div className="grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+              <span>#</span>
+              <span>User</span>
+              <span className="text-right">Gold</span>
+              <span className="text-right">Silver</span>
+              <span className="text-right">Bronze</span>
+              <span className="text-right">Total</span>
+            </div>
+            {podium.map(row => (
+              <div key={row.user_id} className="grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-3 items-center border-b border-gray-800/50">
+                <span className={`font-bold ${row.rank === 1 ? 'text-yellow-400' : row.rank === 2 ? 'text-gray-300' : row.rank === 3 ? 'text-amber-600' : 'text-gray-500'}`}>
+                  {row.rank}
+                </span>
+                <Link to={`/user/${row.user_id}`} className="font-medium hover:text-pink-400 transition-colors">
+                  {row.username}
+                </Link>
+                <span className="text-right text-yellow-400">{row.gold}</span>
+                <span className="text-right text-gray-300">{row.silver}</span>
+                <span className="text-right text-amber-600">{row.bronze}</span>
+                <span className="text-right font-semibold text-pink-400">{row.podiums}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {matches.map(match => {
         const entries = (leaderboards[match.id] || []).filter(e => e.locked)

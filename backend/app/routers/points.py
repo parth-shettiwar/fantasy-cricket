@@ -17,6 +17,28 @@ from app.routers.auth import get_current_user
 router = APIRouter()
 
 
+def _get_live_team_total(ut: UserTeam, db: Session) -> float:
+    """Compute team total from effective XI using latest performances."""
+    effective_players = _build_effective_xi(ut, ut.match_id, db, match=ut.match)
+    total = 0.0
+    for player in effective_players:
+        perf = (
+            db.query(PlayerMatchPerformance)
+            .filter(
+                PlayerMatchPerformance.player_id == player.id,
+                PlayerMatchPerformance.match_id == ut.match_id,
+            )
+            .first()
+        )
+        if not perf:
+            continue
+        pts = calculate_player_points(perf, player.role)
+        is_cap = player.id == ut.captain_id
+        is_vc = player.id == ut.vice_captain_id
+        total += calculate_final_points(pts["total_points"], is_cap, is_vc)
+    return total
+
+
 @router.get("/breakdown/{user_team_id}", response_model=TeamPointsBreakdown)
 def get_points_breakdown(
     user_team_id: int,
@@ -115,23 +137,7 @@ def calculate_and_store_points(
     if not user_team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    total = 0.0
-    effective_players = _build_effective_xi(user_team, user_team.match_id, db, match=user_team.match)
-
-    for player in effective_players:
-        perf = (
-            db.query(PlayerMatchPerformance)
-            .filter(
-                PlayerMatchPerformance.player_id == player.id,
-                PlayerMatchPerformance.match_id == user_team.match_id,
-            )
-            .first()
-        )
-        if perf:
-            pts = calculate_player_points(perf, player.role)
-            is_cap = player.id == user_team.captain_id
-            is_vc = player.id == user_team.vice_captain_id
-            total += calculate_final_points(pts["total_points"], is_cap, is_vc)
+    total = _get_live_team_total(user_team, db)
 
     user_team.total_points = total
     db.commit()
@@ -549,4 +555,108 @@ def compare_users_for_match(
         "shared_players": sorted(shared, key=lambda p: p["name"]),
         "only_user1": only_user1,
         "only_user2": only_user2,
+    }
+
+
+@router.get("/podium")
+def podium_standings(db: Session = Depends(get_db)):
+    """Olympic-style medal table across completed matches."""
+    completed_matches = (
+        db.query(Match.id)
+        .filter(Match.status == MatchStatus.COMPLETED)
+        .all()
+    )
+    match_ids = [m.id for m in completed_matches]
+    if not match_ids:
+        return []
+
+    teams = (
+        db.query(UserTeam)
+        .join(User, User.id == UserTeam.user_id)
+        .options(joinedload(UserTeam.match))
+        .filter(UserTeam.match_id.in_(match_ids))
+        .all()
+    )
+
+    teams_by_match = {}
+    for ut in teams:
+        teams_by_match.setdefault(ut.match_id, []).append(ut)
+
+    medals = {}
+    for mid, match_teams in teams_by_match.items():
+        ranked = sorted(match_teams, key=lambda t: t.total_points, reverse=True)
+        prev_points = None
+        prev_rank = None
+        for idx, ut in enumerate(ranked):
+            rank = prev_rank if prev_points is not None and ut.total_points == prev_points else (idx + 1)
+            prev_points = ut.total_points
+            prev_rank = rank
+
+            if rank not in (1, 2, 3):
+                continue
+            if ut.user_id not in medals:
+                medals[ut.user_id] = {
+                    "user_id": ut.user_id,
+                    "username": ut.user.username if ut.user else "?",
+                    "gold": 0,
+                    "silver": 0,
+                    "bronze": 0,
+                }
+            if rank == 1:
+                medals[ut.user_id]["gold"] += 1
+            elif rank == 2:
+                medals[ut.user_id]["silver"] += 1
+            else:
+                medals[ut.user_id]["bronze"] += 1
+
+    rows = list(medals.values())
+    rows.sort(key=lambda r: (-r["gold"], -r["silver"], -r["bronze"], r["username"].lower()))
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+        r["podiums"] = r["gold"] + r["silver"] + r["bronze"]
+    return rows
+
+
+@router.get("/match/{match_id}/best-xi")
+def best_xi_for_match(match_id: int, db: Session = Depends(get_db)):
+    """Best XI by fantasy points for a match (base player points, no C/VC multiplier)."""
+    match = (
+        db.query(Match)
+        .options(joinedload(Match.team1), joinedload(Match.team2))
+        .filter(Match.id == match_id)
+        .first()
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.status == MatchStatus.UPCOMING:
+        raise HTTPException(status_code=400, detail="Best XI available after match starts")
+
+    perfs = (
+        db.query(PlayerMatchPerformance)
+        .options(joinedload(PlayerMatchPerformance.player).joinedload(Player.team))
+        .filter(PlayerMatchPerformance.match_id == match_id, PlayerMatchPerformance.is_playing == True)
+        .all()
+    )
+
+    rows = []
+    for perf in perfs:
+        if not perf.player:
+            continue
+        pts = calculate_player_points(perf, perf.player.role)
+        rows.append({
+            "player_id": perf.player_id,
+            "name": perf.player.name,
+            "role": perf.player.role.value,
+            "team_short": perf.player.team.short_name if perf.player.team else "",
+            "points": pts["total_points"],
+        })
+
+    rows.sort(key=lambda p: p["points"], reverse=True)
+    best = rows[:11]
+
+    return {
+        "match_id": match.id,
+        "match_name": f"{match.team1.short_name} vs {match.team2.short_name}",
+        "status": match.status.value,
+        "players": best,
     }

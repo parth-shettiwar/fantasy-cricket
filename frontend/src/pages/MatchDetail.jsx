@@ -15,6 +15,7 @@ export default function MatchDetail() {
   const [performances, setPerformances] = useState([])
   const [players, setPlayers] = useState({})
   const [matchTeams, setMatchTeams] = useState([])
+  const [bestXI, setBestXI] = useState([])
   const [expandedTeam, setExpandedTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -26,11 +27,12 @@ export default function MatchDetail() {
     }
 
     try {
-      const [matchRes, perfRes, playersRes, teamsRes] = await Promise.all([
+      const [matchRes, perfRes, playersRes, teamsRes, bestXIRes] = await Promise.all([
         api.get(`/matches/${matchId}`),
         api.get(`/points/match/${matchId}/performances`),
         api.get(`/matches/${matchId}/players`),
         api.get(`/points/match/${matchId}/leaderboard`),
+        api.get(`/points/match/${matchId}/best-xi`).catch(() => ({ data: { players: [] } })),
       ])
 
       if (!mountedRef.current) return
@@ -41,6 +43,7 @@ export default function MatchDetail() {
       playersRes.data.forEach(p => { pmap[p.id] = p })
       setPlayers(pmap)
       setMatchTeams(teamsRes.data)
+      setBestXI(bestXIRes.data?.players || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -243,6 +246,30 @@ export default function MatchDetail() {
           </div>
         )}
       </section>
+
+      {bestXI.length > 0 && (
+        <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-800">
+            <h2 className="text-sm font-semibold text-gray-300">Best Playing XI (By Match Points)</h2>
+          </div>
+          <div className="grid grid-cols-[40px_1fr_70px] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+            <span>#</span>
+            <span>Player</span>
+            <span className="text-right">Points</span>
+          </div>
+          {bestXI.map((p, idx) => (
+            <div key={p.player_id} className="grid grid-cols-[40px_1fr_70px] gap-3 px-5 py-3 items-center border-b border-gray-800/50">
+              <span className="font-bold text-gray-500">{idx + 1}</span>
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="truncate text-sm">{p.name}</span>
+                <span className={`text-[10px] ${ROLE_COLORS[p.role] || 'text-gray-500'}`}>{p.role}</span>
+                <span className="text-[10px] text-gray-600">{p.team_short}</span>
+              </div>
+              <span className="text-right font-semibold text-pink-400">{Number(p.points || 0).toFixed(1)}</span>
+            </div>
+          ))}
+        </section>
+      )}
 
       {playingPerfs.length > 0 && (
         <section className="space-y-4">
