@@ -56,6 +56,7 @@ export default function TeamSelection() {
   const [aiMessage, setAiMessage] = useState('')
   const [aiAlternatives, setAiAlternatives] = useState([])
   const [aiContext, setAiContext] = useState(null)
+  const [aiExplanation, setAiExplanation] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -218,11 +219,13 @@ export default function TeamSelection() {
       setAiMessage(data.message || '')
       setAiAlternatives(data.alternatives || [])
       setAiContext(data.context || null)
+      setAiExplanation(data.explanation || '')
     } catch (err) {
       setAiRecommendation(null)
       setAiMessage(err.response?.data?.detail || 'Could not fetch AI recommendation')
       setAiAlternatives([])
       setAiContext(null)
+      setAiExplanation('')
     } finally {
       setAiLoading(false)
     }
@@ -256,6 +259,7 @@ export default function TeamSelection() {
     }).catch(() => {})
     setAiRecommendation(null)
     setAiAlternatives([])
+    setAiExplanation('')
   }
 
   const getTeamName = (p) => p.team_id === match?.team1?.id ? match.team1.short_name : match?.team2?.short_name
@@ -407,6 +411,9 @@ export default function TeamSelection() {
             )}
             {aiRecommendation.why_tags?.length > 0 && (
               <p className="text-[11px] text-gray-500 mt-1">{aiRecommendation.why_tags.join(' · ')}</p>
+            )}
+            {aiExplanation && (
+              <p className="text-[11px] text-gray-400 mt-2">{aiExplanation}</p>
             )}
             {aiAlternatives.length > 0 && (
               <p className="text-[11px] text-gray-500 mt-2">

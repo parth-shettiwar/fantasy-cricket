@@ -1,9 +1,11 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 import json
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+import httpx
 
 from app.database import get_db
 from app.models import (
@@ -32,6 +34,9 @@ ROLE_BASELINE = {
 
 _CACHE: dict[str, dict] = {}
 _CACHE_TTL_SECONDS = 600
+LLM_ENABLED = os.environ.get("LLM_ENABLED", "false").lower() == "true"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
 
 
 def _is_valid_team(players: list[Player], match: Match) -> bool:
@@ -152,6 +157,66 @@ def _team_total_with_cvc(selected_ids: set[int], captain_id: int, vice_captain_i
         else:
             total += p
     return total
+
+
+def _llm_explanation(recommendation: dict, context: dict) -> str:
+    """Optional LLM explanation with safe deterministic fallback."""
+    if not LLM_ENABLED or not OPENAI_API_KEY:
+        return ""
+
+    rec_type = recommendation.get("recommendation_type", "swap")
+    if rec_type == "vc_change":
+        rec_line = (
+            f"Recommend changing C/VC from "
+            f"{recommendation.get('from_captain_id')}/{recommendation.get('from_vice_captain_id')} "
+            f"to {recommendation.get('to_captain_id')}/{recommendation.get('to_vice_captain_id')} "
+            f"for expected gain {recommendation.get('expected_gain')} points."
+        )
+    else:
+        rec_line = (
+            f"Recommend swapping OUT {recommendation.get('swap_out', {}).get('name')} "
+            f"for IN {recommendation.get('swap_in', {}).get('name')} "
+            f"for expected gain {recommendation.get('expected_gain')} points."
+        )
+
+    prompt = (
+        "You are a fantasy cricket assistant. Write 2 short sentences explaining the recommendation.\n"
+        "Be specific, concise, and grounded only in provided data.\n"
+        f"Context: pitch={context.get('pitch_type')}, dew={context.get('dew_factor')}, venue={context.get('venue')}.\n"
+        f"Risk={recommendation.get('risk_level')}, confidence={recommendation.get('confidence_score')}.\n"
+        f"Tags={', '.join(recommendation.get('why_tags', []))}.\n"
+        f"{rec_line}"
+    )
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": OPENAI_MODEL,
+                    "messages": [
+                        {"role": "system", "content": "You generate concise fantasy cricket explanations."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": 120,
+                },
+            )
+        if resp.status_code >= 400:
+            return ""
+        data = resp.json()
+        return (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+    except Exception:
+        return ""
 
 
 @router.post("/recommend/swap")
@@ -395,6 +460,12 @@ def recommend_one_swap(
         alternatives[1]["profile"] = "upside"
 
     # Cache exact payload recommendation.
+    explanation = _llm_explanation(recommendation, {
+        "pitch_type": pitch_type,
+        "dew_factor": dew_factor,
+        "venue": match.venue,
+    })
+
     response = {
         "recommendation": recommendation,
         "alternatives": alternatives[:3],
@@ -403,6 +474,7 @@ def recommend_one_swap(
             "dew_factor": dew_factor,
             "venue": match.venue,
         },
+        "explanation": explanation,
     }
     _cache_set(cache_key, response)
     return {

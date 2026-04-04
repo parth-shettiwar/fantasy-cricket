@@ -635,11 +635,18 @@ def best_xi_for_match(match_id: int, db: Session = Depends(get_db)):
         db.query(PlayerMatchPerformance)
         .options(joinedload(PlayerMatchPerformance.player).joinedload(Player.team))
         .filter(PlayerMatchPerformance.match_id == match_id, PlayerMatchPerformance.is_playing == True)
+        .order_by(PlayerMatchPerformance.id.desc())
         .all()
     )
 
-    rows = []
+    # Deduplicate defensivey by player_id in case legacy duplicate rows exist.
+    latest_perf_by_player = {}
     for perf in perfs:
+        if perf.player_id not in latest_perf_by_player:
+            latest_perf_by_player[perf.player_id] = perf
+
+    rows = []
+    for perf in latest_perf_by_player.values():
         if not perf.player:
             continue
         pts = calculate_player_points(perf, perf.player.role)
