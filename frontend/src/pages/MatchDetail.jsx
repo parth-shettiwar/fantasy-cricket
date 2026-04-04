@@ -16,6 +16,7 @@ export default function MatchDetail() {
   const [players, setPlayers] = useState({})
   const [matchTeams, setMatchTeams] = useState([])
   const [bestXI, setBestXI] = useState([])
+  const [bestXIMeta, setBestXIMeta] = useState(null)
   const [expandedTeam, setExpandedTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -44,6 +45,7 @@ export default function MatchDetail() {
       setPlayers(pmap)
       setMatchTeams(teamsRes.data)
       setBestXI(bestXIRes.data?.players || [])
+      setBestXIMeta(bestXIRes.data || null)
     } catch (err) {
       console.error(err)
     } finally {
@@ -249,8 +251,12 @@ export default function MatchDetail() {
 
       {bestXI.length > 0 && (
         <section className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-800">
+          <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-gray-300">Best Playing XI (By Match Points)</h2>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Best XI Total (with C/VC)</p>
+              <p className="text-sm font-bold text-pink-400">{Number(bestXIMeta?.best_xi_total_points || 0).toFixed(1)}</p>
+            </div>
           </div>
           <div className="grid grid-cols-[40px_1fr_70px] gap-3 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
             <span>#</span>
@@ -264,6 +270,12 @@ export default function MatchDetail() {
                 <span className="truncate text-sm">{p.name}</span>
                 <span className={`text-[10px] ${ROLE_COLORS[p.role] || 'text-gray-500'}`}>{p.role}</span>
                 <span className="text-[10px] text-gray-600">{p.team_short}</span>
+                {p.player_id === bestXIMeta?.captain_id && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/50 text-orange-400 border border-orange-800 font-bold">C</span>
+                )}
+                {p.player_id === bestXIMeta?.vice_captain_id && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800 font-bold">VC</span>
+                )}
               </div>
               <span className="text-right font-semibold text-pink-400">{Number(p.points || 0).toFixed(1)}</span>
             </div>

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.database import engine, Base
-from app.routers import auth, matches, teams, points, rooms, admin
+from app.routers import auth, matches, teams, points, rooms, admin, ai
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +38,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(points.router, prefix="/api/points", tags=["points"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 

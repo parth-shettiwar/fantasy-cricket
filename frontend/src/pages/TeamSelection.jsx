@@ -51,6 +51,9 @@ export default function TeamSelection() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [existingTeamId, setExistingTeamId] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiRecommendation, setAiRecommendation] = useState(null)
+  const [aiMessage, setAiMessage] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -194,6 +197,48 @@ export default function TeamSelection() {
     }
   }
 
+  const fetchAIRecommendation = async () => {
+    if (selected.size !== 11 || !captain || !viceCaptain) {
+      setAiMessage('Pick full XI with Captain and VC first')
+      setAiRecommendation(null)
+      return
+    }
+    setAiLoading(true)
+    setAiMessage('')
+    try {
+      const { data } = await api.post('/ai/recommend/swap', {
+        match_id: parseInt(matchId),
+        player_ids: [...selected],
+        captain_id: captain,
+        vice_captain_id: viceCaptain,
+      })
+      setAiRecommendation(data.recommendation)
+      setAiMessage(data.message || '')
+    } catch (err) {
+      setAiRecommendation(null)
+      setAiMessage(err.response?.data?.detail || 'Could not fetch AI recommendation')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const applyAIRecommendation = () => {
+    if (!aiRecommendation) return
+    const outId = aiRecommendation.swap_out.id
+    const inId = aiRecommendation.swap_in.id
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.delete(outId)
+      next.add(inId)
+      return next
+    })
+    if (captain === outId) setCaptain(null)
+    if (viceCaptain === outId) setViceCaptain(null)
+    setSubstitutes(prev => prev.filter(id => id !== inId))
+    setAiMessage('AI swap applied. Re-check Captain/VC if needed.')
+    setAiRecommendation(null)
+  }
+
   const getTeamName = (p) => p.team_id === match?.team1?.id ? match.team1.short_name : match?.team2?.short_name
 
   if (loading) {
@@ -297,6 +342,41 @@ export default function TeamSelection() {
         <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
           <div className="bg-pink-500 h-2 rounded-full transition-all" style={{ width: `${(selected.size / 11) * 100}%` }}></div>
         </div>
+      </div>
+
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-300">AI Assistant (One Smart Swap)</h3>
+            <p className="text-xs text-gray-500 mt-1">Personalized suggestion based on your current XI.</p>
+          </div>
+          <button
+            onClick={fetchAIRecommendation}
+            disabled={aiLoading}
+            className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {aiLoading ? 'Analyzing...' : 'Get AI Swap'}
+          </button>
+        </div>
+        {aiMessage && (
+          <p className="text-xs text-gray-500 mt-3">{aiMessage}</p>
+        )}
+        {aiRecommendation && (
+          <div className="mt-3 p-3 rounded-lg border border-pink-800 bg-pink-900/10">
+            <p className="text-sm">
+              Swap <span className="text-red-300">{aiRecommendation.swap_out.name}</span> with <span className="text-emerald-300">{aiRecommendation.swap_in.name}</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Expected gain: +{Number(aiRecommendation.expected_gain || 0).toFixed(1)} pts</p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={applyAIRecommendation}
+                className="text-xs px-3 py-1.5 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors"
+              >
+                Apply Swap
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (

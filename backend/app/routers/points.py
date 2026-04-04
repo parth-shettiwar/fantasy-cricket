@@ -654,9 +654,25 @@ def best_xi_for_match(match_id: int, db: Session = Depends(get_db)):
     rows.sort(key=lambda p: p["points"], reverse=True)
     best = rows[:11]
 
+    captain_id = best[0]["player_id"] if best else None
+    vice_captain_id = best[1]["player_id"] if len(best) > 1 else None
+    base_total = sum(p["points"] for p in best)
+    best_xi_total = 0.0
+    for p in best:
+        if p["player_id"] == captain_id:
+            best_xi_total += p["points"] * 2.0
+        elif p["player_id"] == vice_captain_id:
+            best_xi_total += p["points"] * 1.5
+        else:
+            best_xi_total += p["points"]
+
     return {
         "match_id": match.id,
         "match_name": f"{match.team1.short_name} vs {match.team2.short_name}",
         "status": match.status.value,
+        "captain_id": captain_id,
+        "vice_captain_id": vice_captain_id,
+        "base_total_points": round(base_total, 1),
+        "best_xi_total_points": round(best_xi_total, 1),
         "players": best,
     }
