@@ -589,7 +589,14 @@ def podium_standings(db: Session = Depends(get_db)):
 
     medals = {}
     for mid, match_teams in teams_by_match.items():
-        ranked = sorted(match_teams, key=lambda t: t.total_points, reverse=True)
+        # Defensive dedupe: one best-scoring team per user per match.
+        best_team_per_user = {}
+        for ut in match_teams:
+            prev = best_team_per_user.get(ut.user_id)
+            if prev is None or (ut.total_points or 0) > (prev.total_points or 0):
+                best_team_per_user[ut.user_id] = ut
+
+        ranked = sorted(best_team_per_user.values(), key=lambda t: t.total_points, reverse=True)
         prev_points = None
         prev_rank = None
         for idx, ut in enumerate(ranked):
