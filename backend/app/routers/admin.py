@@ -13,9 +13,9 @@ from bs4 import BeautifulSoup
 from app.database import get_db
 from app.models import (
     Match, MatchStatus, IPLTeam, Player, PlayerRole,
-    PlayerMatchPerformance, UserTeam, UserTeamSubstitute, user_team_players,
+    PlayerMatchPerformance, UserTeam, UserTeamSubstitute, user_team_players, MatchCondition,
 )
-from app.schemas import SetCricbuzzId, SetMatchStatus
+from app.schemas import SetCricbuzzId, SetMatchStatus, SetMatchConditions
 from app.services.scheduler import update_match_scores
 from app.services.cricket_scraper import HEADERS
 
@@ -344,6 +344,38 @@ async def set_match_status(
     match.status = body.status
     db.commit()
     return {"match_id": match_id, "status": body.status}
+
+
+@router.post("/match/{match_id}/conditions")
+async def set_match_conditions(
+    match_id: int,
+    body: SetMatchConditions,
+    db: Session = Depends(get_db),
+    _=Depends(verify_admin),
+):
+    """Set pitch/condition context used by AI recommendations."""
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if body.pitch_type not in {"batting", "spin", "pace", "balanced"}:
+        raise HTTPException(status_code=400, detail="pitch_type must be one of batting|spin|pace|balanced")
+    if body.dew_factor < 0 or body.dew_factor > 1:
+        raise HTTPException(status_code=400, detail="dew_factor must be between 0 and 1")
+
+    cond = db.query(MatchCondition).filter(MatchCondition.match_id == match_id).first()
+    if not cond:
+        cond = MatchCondition(match_id=match_id)
+        db.add(cond)
+    cond.pitch_type = body.pitch_type
+    cond.dew_factor = body.dew_factor
+    cond.notes = body.notes
+    db.commit()
+    return {
+        "match_id": match_id,
+        "pitch_type": cond.pitch_type,
+        "dew_factor": cond.dew_factor,
+        "notes": cond.notes,
+    }
 
 
 @router.get("/matches")

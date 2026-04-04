@@ -54,6 +54,8 @@ export default function TeamSelection() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [aiMessage, setAiMessage] = useState('')
+  const [aiAlternatives, setAiAlternatives] = useState([])
+  const [aiContext, setAiContext] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -214,9 +216,13 @@ export default function TeamSelection() {
       })
       setAiRecommendation(data.recommendation)
       setAiMessage(data.message || '')
+      setAiAlternatives(data.alternatives || [])
+      setAiContext(data.context || null)
     } catch (err) {
       setAiRecommendation(null)
       setAiMessage(err.response?.data?.detail || 'Could not fetch AI recommendation')
+      setAiAlternatives([])
+      setAiContext(null)
     } finally {
       setAiLoading(false)
     }
@@ -224,19 +230,32 @@ export default function TeamSelection() {
 
   const applyAIRecommendation = () => {
     if (!aiRecommendation) return
-    const outId = aiRecommendation.swap_out.id
-    const inId = aiRecommendation.swap_in.id
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.delete(outId)
-      next.add(inId)
-      return next
-    })
-    if (captain === outId) setCaptain(null)
-    if (viceCaptain === outId) setViceCaptain(null)
-    setSubstitutes(prev => prev.filter(id => id !== inId))
-    setAiMessage('AI swap applied. Re-check Captain/VC if needed.')
+    if (aiRecommendation.recommendation_type === 'vc_change') {
+      setCaptain(aiRecommendation.to_captain_id)
+      setViceCaptain(aiRecommendation.to_vice_captain_id)
+      setAiMessage('AI captain/vice-captain change applied.')
+    } else {
+      const outId = aiRecommendation.swap_out.id
+      const inId = aiRecommendation.swap_in.id
+      setSelected(prev => {
+        const next = new Set(prev)
+        next.delete(outId)
+        next.add(inId)
+        return next
+      })
+      if (captain === outId) setCaptain(aiRecommendation.new_captain_id || null)
+      if (viceCaptain === outId) setViceCaptain(aiRecommendation.new_vice_captain_id || null)
+      setSubstitutes(prev => prev.filter(id => id !== inId))
+      setAiMessage('AI swap applied.')
+    }
+    api.post('/ai/feedback', {
+      match_id: parseInt(matchId),
+      recommendation_type: aiRecommendation.recommendation_type || 'swap',
+      accepted: true,
+      payload_json: JSON.stringify(aiRecommendation),
+    }).catch(() => {})
     setAiRecommendation(null)
+    setAiAlternatives([])
   }
 
   const getTeamName = (p) => p.team_id === match?.team1?.id ? match.team1.short_name : match?.team2?.short_name
@@ -363,16 +382,43 @@ export default function TeamSelection() {
         )}
         {aiRecommendation && (
           <div className="mt-3 p-3 rounded-lg border border-pink-800 bg-pink-900/10">
-            <p className="text-sm">
-              Swap <span className="text-red-300">{aiRecommendation.swap_out.name}</span> with <span className="text-emerald-300">{aiRecommendation.swap_in.name}</span>
+            {aiRecommendation.recommendation_type === 'vc_change' ? (
+              <p className="text-sm">
+                Change C/VC to improve multipliers (+{Number(aiRecommendation.expected_gain || 0).toFixed(1)} pts)
+              </p>
+            ) : (
+              <p className="text-sm">
+                Swap <span className="text-red-300">{aiRecommendation.swap_out.name}</span> with <span className="text-emerald-300">{aiRecommendation.swap_in.name}</span>
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Expected gain: +{Number(aiRecommendation.expected_gain || 0).toFixed(1)} pts
+              {aiRecommendation.confidence_score !== undefined && (
+                <span className="ml-2">· Confidence: {(Number(aiRecommendation.confidence_score) * 100).toFixed(0)}%</span>
+              )}
+              {aiRecommendation.risk_level && (
+                <span className="ml-2">· Risk: {String(aiRecommendation.risk_level).toUpperCase()}</span>
+              )}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Expected gain: +{Number(aiRecommendation.expected_gain || 0).toFixed(1)} pts</p>
+            {aiContext && (
+              <p className="text-[11px] text-gray-500 mt-1">
+                Context: {aiContext.pitch_type} pitch · dew {Number(aiContext.dew_factor || 0).toFixed(2)} · {aiContext.venue}
+              </p>
+            )}
+            {aiRecommendation.why_tags?.length > 0 && (
+              <p className="text-[11px] text-gray-500 mt-1">{aiRecommendation.why_tags.join(' · ')}</p>
+            )}
+            {aiAlternatives.length > 0 && (
+              <p className="text-[11px] text-gray-500 mt-2">
+                Alternatives: {aiAlternatives.map(a => `+${Number(a.expected_gain || 0).toFixed(1)} ${a.profile ? `(${a.profile})` : ''}`).join(', ')}
+              </p>
+            )}
             <div className="flex gap-2 mt-3">
               <button
                 onClick={applyAIRecommendation}
                 className="text-xs px-3 py-1.5 rounded-lg bg-pink-600 text-white hover:bg-pink-500 transition-colors"
               >
-                Apply Swap
+                Apply Recommendation
               </button>
             </div>
           </div>

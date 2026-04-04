@@ -186,3 +186,54 @@ class RoomMember(Base):
 
     room = relationship("Room", back_populates="members")
     user = relationship("User")
+
+
+class MatchCondition(Base):
+    __tablename__ = "match_conditions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, ForeignKey("matches.id"), unique=True, nullable=False, index=True)
+    pitch_type = Column(String, default="balanced")  # batting, spin, pace, balanced
+    dew_factor = Column(Float, default=0.0)  # 0..1
+    notes = Column(String, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    match = relationship("Match")
+
+
+class PlayerFeatureSnapshot(Base):
+    __tablename__ = "player_feature_snapshots"
+    __table_args__ = (
+        UniqueConstraint("player_id", "season", name="uq_player_feature_season"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+    season = Column(Integer, nullable=False, index=True)
+    matches = Column(Integer, default=0)
+    fantasy_avg = Column(Float, default=0.0)
+    batting_avg = Column(Float, default=0.0)
+    bowling_avg = Column(Float, default=0.0)
+    fielding_avg = Column(Float, default=0.0)
+    vs_spin_index = Column(Float, default=1.0)
+    vs_pace_index = Column(Float, default=1.0)
+    venue_index = Column(Float, default=1.0)
+    consistency_index = Column(Float, default=1.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    player = relationship("Player")
+
+
+class AIRecommendationFeedback(Base):
+    __tablename__ = "ai_recommendation_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    recommendation_type = Column(String, nullable=False)  # swap, vc_change
+    accepted = Column(Boolean, nullable=False)
+    payload_json = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    match = relationship("Match")

@@ -221,3 +221,16 @@ class SetCricbuzzId(BaseModel):
 
 class SetMatchStatus(BaseModel):
     status: MatchStatus
+
+
+class SetMatchConditions(BaseModel):
+    pitch_type: str
+    dew_factor: float = 0.0
+    notes: str = ""
+
+
+class AIFeedbackRequest(BaseModel):
+    match_id: int
+    recommendation_type: str
+    accepted: bool
+    payload_json: str = ""
