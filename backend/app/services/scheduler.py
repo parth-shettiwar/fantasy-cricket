@@ -22,11 +22,12 @@ from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session, joinedload
+from passlib.context import CryptContext
 
 from app.database import SessionLocal
 from app.models import (
     Match, MatchStatus, Player, PlayerMatchPerformance, PlayerRole,
-    UserTeam, UserTeamSubstitute, user_team_players,
+    User, UserTeam, UserTeamSubstitute, user_team_players,
 )
 from app.services.cricket_scraper import (
     scrape_scorecard, build_player_name_index, match_player_name,
@@ -36,6 +37,23 @@ from app.services.points_engine import calculate_player_points, calculate_final_
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+AI_BOT_USERNAME = "Aladdin"
+AI_BOT_EMAIL = "aladdin.bot@fantasy.local"
+
+MAX_CREDITS = 100.0
+ROLE_CONSTRAINTS = {
+    PlayerRole.WK: (1, 4),
+    PlayerRole.BAT: (1, 6),
+    PlayerRole.AR: (1, 4),
+    PlayerRole.BOWL: (1, 6),
+}
+ROLE_BASELINE = {
+    PlayerRole.WK: 26.0,
+    PlayerRole.BAT: 28.0,
+    PlayerRole.AR: 32.0,
+    PlayerRole.BOWL: 27.0,
+}
 
 
 def _get_locked_ids(match: Match) -> Optional[set[int]]:
@@ -322,11 +340,174 @@ async def poll_live_matches():
         db.close()
 
 
+def _get_or_create_ai_user(db: Session) -> User:
+    user = db.query(User).filter(User.username == AI_BOT_USERNAME).first()
+    if user:
+        return user
+    user = User(
+        username=AI_BOT_USERNAME,
+        email=AI_BOT_EMAIL,
+        password_hash=pwd_context.hash("AladdinTemp@2026!"),
+    )
+    db.add(user)
+    db.flush()
+    logger.info("Created AI bot user: %s", AI_BOT_USERNAME)
+    return user
+
+
+def _project_player_for_match(player: Player, target_match: Match, db: Session) -> float:
+    perfs = (
+        db.query(PlayerMatchPerformance)
+        .options(joinedload(PlayerMatchPerformance.match))
+        .filter(PlayerMatchPerformance.player_id == player.id)
+        .all()
+    )
+    hist = [
+        p for p in perfs
+        if p.match and p.match.date and p.match.date < target_match.date
+    ]
+    if not hist:
+        return ROLE_BASELINE[player.role]
+
+    hist.sort(key=lambda x: x.match.date)
+    recent = hist[-20:]
+    weighted = 0.0
+    weight_sum = 0.0
+    for i, perf in enumerate(recent):
+        w = i + 1
+        weight_sum += w
+        weighted += calculate_player_points(perf, player.role)["total_points"] * w
+    return weighted / max(weight_sum, 1.0)
+
+
+def _build_ai_team(match: Match, db: Session) -> list[Player]:
+    pool = (
+        db.query(Player)
+        .filter(Player.team_id.in_([match.team1_id, match.team2_id]))
+        .all()
+    )
+    if len(pool) < 11:
+        return []
+
+    projected = {p.id: _project_player_for_match(p, match, db) for p in pool}
+    team: list[Player] = []
+    role_counts: Counter = Counter()
+    team_counts: Counter = Counter()
+    credits = 0.0
+
+    # Satisfy minimum role constraints first.
+    for role, (min_c, _) in ROLE_CONSTRAINTS.items():
+        role_players = sorted(
+            [p for p in pool if p.role == role and p.id not in {x.id for x in team}],
+            key=lambda p: projected[p.id],
+            reverse=True,
+        )
+        for p in role_players:
+            if role_counts[role] >= min_c:
+                break
+            if credits + p.credits > MAX_CREDITS:
+                continue
+            if team_counts[p.team_id] >= 7:
+                continue
+            team.append(p)
+            role_counts[p.role] += 1
+            team_counts[p.team_id] += 1
+            credits += p.credits
+
+    # Fill remaining slots by best projected points while respecting max limits.
+    for p in sorted(pool, key=lambda x: projected[x.id], reverse=True):
+        if len(team) >= 11:
+            break
+        if p.id in {x.id for x in team}:
+            continue
+        _, max_c = ROLE_CONSTRAINTS[p.role]
+        if role_counts[p.role] >= max_c:
+            continue
+        if team_counts[p.team_id] >= 7:
+            continue
+        if credits + p.credits > MAX_CREDITS:
+            continue
+        team.append(p)
+        role_counts[p.role] += 1
+        team_counts[p.team_id] += 1
+        credits += p.credits
+
+    if len(team) != 11:
+        return []
+    # Final hard validation.
+    for role, (min_c, max_c) in ROLE_CONSTRAINTS.items():
+        c = role_counts.get(role, 0)
+        if c < min_c or c > max_c:
+            return []
+    return team
+
+
+async def submit_ai_teams():
+    """Auto-submit AI bot teams about 3 hours before each upcoming match."""
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        ai_user = _get_or_create_ai_user(db)
+        matches = (
+            db.query(Match)
+            .options(joinedload(Match.team1), joinedload(Match.team2))
+            .filter(Match.status == MatchStatus.UPCOMING)
+            .all()
+        )
+        for match in matches:
+            if not match.date or not match.lock_time:
+                continue
+            seconds_to_match = (match.date - now).total_seconds()
+            # Trigger window: from 3h before match until lock time.
+            if not (match.lock_time > now and seconds_to_match <= 3 * 3600):
+                continue
+
+            existing = (
+                db.query(UserTeam)
+                .filter(UserTeam.user_id == ai_user.id, UserTeam.match_id == match.id)
+                .first()
+            )
+            if existing:
+                continue
+
+            team_players = _build_ai_team(match, db)
+            if len(team_players) != 11:
+                logger.warning("AI bot team generation failed for match %d", match.id)
+                continue
+
+            projected = sorted(
+                team_players,
+                key=lambda p: _project_player_for_match(p, match, db),
+                reverse=True,
+            )
+            captain_id = projected[0].id
+            vice_captain_id = projected[1].id
+
+            ut = UserTeam(
+                user_id=ai_user.id,
+                match_id=match.id,
+                captain_id=captain_id,
+                vice_captain_id=vice_captain_id,
+            )
+            db.add(ut)
+            db.flush()
+            for p in team_players:
+                db.execute(user_team_players.insert().values(user_team_id=ut.id, player_id=p.id))
+            db.commit()
+            logger.info("AI bot submitted team for match %d (%s vs %s)", match.id, match.team1.short_name, match.team2.short_name)
+    except Exception:
+        logger.exception("AI bot submission job failed")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the background scheduler (call once at app startup)."""
     scheduler.add_job(poll_live_matches, "interval", minutes=5, id="poll_scores", replace_existing=True)
+    scheduler.add_job(submit_ai_teams, "interval", minutes=10, id="submit_ai_teams", replace_existing=True)
     scheduler.start()
-    logger.info("Score polling scheduler started (every 5 minutes)")
+    logger.info("Schedulers started: poll_scores(5m), submit_ai_teams(10m)")
 
 
 def stop_scheduler():
