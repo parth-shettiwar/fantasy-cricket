@@ -92,7 +92,7 @@ export default function Leaderboard() {
           <p className="text-gray-500 text-sm px-5 py-4">No podium finishes yet.</p>
         ) : (
           <div>
-            <div className="grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
+            <div className="hidden md:grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-2 text-xs text-gray-500 font-medium border-b border-gray-800">
               <span>#</span>
               <span>User</span>
               <span className="text-right">Gold</span>
@@ -101,17 +101,32 @@ export default function Leaderboard() {
               <span className="text-right">Total</span>
             </div>
             {podium.map(row => (
-              <div key={row.user_id} className="grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-3 items-center border-b border-gray-800/50">
-                <span className={`font-bold ${row.rank === 1 ? 'text-yellow-400' : row.rank === 2 ? 'text-gray-300' : row.rank === 3 ? 'text-amber-600' : 'text-gray-500'}`}>
-                  {row.rank}
-                </span>
-                <Link to={`/user/${row.user_id}`} className="font-medium hover:text-pink-400 transition-colors">
-                  {row.username}
-                </Link>
-                <span className="text-right text-yellow-400">{row.gold}</span>
-                <span className="text-right text-gray-300">{row.silver}</span>
-                <span className="text-right text-amber-600">{row.bronze}</span>
-                <span className="text-right font-semibold text-pink-400">{row.podiums}</span>
+              <div key={row.user_id} className="border-b border-gray-800/50">
+                <div className="hidden md:grid grid-cols-[40px_1fr_70px_70px_70px_70px] gap-2 px-5 py-3 items-center">
+                  <span className={`font-bold ${row.rank === 1 ? 'text-yellow-400' : row.rank === 2 ? 'text-gray-300' : row.rank === 3 ? 'text-amber-600' : 'text-gray-500'}`}>
+                    {row.rank}
+                  </span>
+                  <Link to={`/user/${row.user_id}`} className="font-medium hover:text-pink-400 transition-colors">
+                    {row.username}
+                  </Link>
+                  <span className="text-right text-yellow-400">{row.gold}</span>
+                  <span className="text-right text-gray-300">{row.silver}</span>
+                  <span className="text-right text-amber-600">{row.bronze}</span>
+                  <span className="text-right font-semibold text-pink-400">{row.podiums}</span>
+                </div>
+                <div className="md:hidden px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Link to={`/user/${row.user_id}`} className="font-medium hover:text-pink-400 transition-colors truncate">
+                      #{row.rank} {row.username}
+                    </Link>
+                    <span className="text-xs text-pink-400 font-semibold">Total: {row.podiums}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <span className="text-yellow-400">G: {row.gold}</span>
+                    <span className="text-gray-300">S: {row.silver}</span>
+                    <span className="text-amber-600">B: {row.bronze}</span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
