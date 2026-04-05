@@ -8,6 +8,7 @@ export default function Home() {
   const [matches, setMatches] = useState([])
   const [teamCounts, setTeamCounts] = useState({})
   const [myMatchIds, setMyMatchIds] = useState(new Set())
+  const [activeTab, setActiveTab] = useState('upcoming')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,6 +41,15 @@ export default function Home() {
   const completedIds = new Set(completed.map(m => m.id))
   const liveIds = new Set(live.map(m => m.id))
   const upcoming = matches.filter(m => !liveIds.has(m.id) && !completedIds.has(m.id))
+  const tabs = [
+    { id: 'upcoming', label: `Upcoming (${upcoming.length})` },
+    { id: 'live', label: `Live (${live.length})` },
+    { id: 'completed', label: `Completed (${completed.length})` },
+  ]
+  const activeMatches =
+    activeTab === 'live' ? live :
+    activeTab === 'completed' ? completed :
+    upcoming
 
   if (loading) {
     return (
@@ -58,35 +68,37 @@ export default function Home() {
         <p className="text-gray-400">Pick your dream XI and compete for the top of the leaderboard</p>
       </div>
 
-      {live.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-            Live Matches
-          </h2>
+      <section className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-pink-600 text-white border-pink-500'
+                  : 'bg-gray-900 text-gray-300 border-gray-800 hover:bg-gray-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {activeMatches.length === 0 ? (
+          <p className="text-sm text-gray-500">No matches in this tab.</p>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {live.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
+            {activeMatches.map(match => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                teamCount={teamCounts[match.id] || 0}
+                hasTeam={myMatchIds.has(match.id)}
+              />
+            ))}
           </div>
-        </section>
-      )}
-
-      {upcoming.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-pink-400 mb-4">Upcoming Matches</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcoming.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
-          </div>
-        </section>
-      )}
-
-      {completed.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-gray-400 mb-4">Completed Matches</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {completed.map(match => <MatchCard key={match.id} match={match} teamCount={teamCounts[match.id] || 0} hasTeam={myMatchIds.has(match.id)} />)}
-          </div>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   )
 }

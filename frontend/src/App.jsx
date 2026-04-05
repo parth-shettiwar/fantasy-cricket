@@ -16,6 +16,7 @@ import JoinRoom from './pages/JoinRoom'
 import UserProfile from './pages/UserProfile'
 import TeamDetail from './pages/TeamDetail'
 import TeamCompare from './pages/TeamCompare'
+import PointsSystem from './pages/PointsSystem'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -92,6 +93,9 @@ function App() {
               <Link to="/" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
                 Matches
               </Link>
+              <Link to="/points-system" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
+                Points
+              </Link>
               {user && (
                 <>
                   <Link to="/my-teams" className="text-gray-300 hover:text-pink-300 transition-colors text-sm font-medium">
@@ -151,6 +155,7 @@ function App() {
           <Route path="/user/:userId" element={<UserProfile />} />
           <Route path="/team/:teamId" element={<TeamDetail />} />
           <Route path="/compare" element={<TeamCompare />} />
+          <Route path="/points-system" element={<PointsSystem />} />
         </Routes>
       </main>
     </div>

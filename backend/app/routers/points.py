@@ -647,18 +647,23 @@ def best_xi_for_match(match_id: int, db: Session = Depends(get_db)):
         db.query(PlayerMatchPerformance)
         .options(joinedload(PlayerMatchPerformance.player).joinedload(Player.team))
         .filter(PlayerMatchPerformance.match_id == match_id, PlayerMatchPerformance.is_playing == True)
-        .order_by(PlayerMatchPerformance.id.desc())
         .all()
     )
 
-    # Deduplicate defensivey by player_id in case legacy duplicate rows exist.
-    latest_perf_by_player = {}
+    # Deduplicate defensively by player_id in case legacy duplicate rows exist.
+    # Keep the row that yields highest fantasy points for that player.
+    best_perf_by_player = {}
     for perf in perfs:
-        if perf.player_id not in latest_perf_by_player:
-            latest_perf_by_player[perf.player_id] = perf
+        if not perf.player:
+            continue
+        cur = best_perf_by_player.get(perf.player_id)
+        cur_pts = calculate_player_points(cur, cur.player.role)["total_points"] if cur and cur.player else -1e9
+        new_pts = calculate_player_points(perf, perf.player.role)["total_points"]
+        if cur is None or new_pts > cur_pts:
+            best_perf_by_player[perf.player_id] = perf
 
     rows = []
-    for perf in latest_perf_by_player.values():
+    for perf in best_perf_by_player.values():
         if not perf.player:
             continue
         pts = calculate_player_points(perf, perf.player.role)
